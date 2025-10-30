@@ -92,7 +92,7 @@ railwaystudio/
 ├── requirements.txt         # Python dependencies
 ├── README.md               # This file
 │
-├── layouts/                # 📂 Your railway layout files
+├── layouts/                # 📂 Railway layout files
 │   ├── README.md           # Layout folder documentation
 │   └── *.json              # Saved layout files
 │
@@ -181,14 +181,6 @@ Detailed documentation is available in the `docs/` folder:
 - Ensure all block IDs are unique
 - Verify connections in metadata
 
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
 ## 📝 License
 
 This project is licensed under the MIT License.
@@ -198,7 +190,3 @@ This project is licensed under the MIT License.
 Built with:
 - [PySide6](https://doc.qt.io/qtforpython-6/) - Qt for Python
 - [Python 3.13](https://www.python.org/) - Programming language
-
----
-
-**Made with ❤️ for railway enthusiasts and system integrators**
