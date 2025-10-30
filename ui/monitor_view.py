@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGraphicsView,
                                QLineEdit, QGroupBox, QTextEdit, QFrame)
 from PySide6.QtCore import Qt, QThread, Signal, QPointF
 from PySide6.QtGui import QPainter, QColor, QBrush, QFont
-from PySide6.QtNetwork import QUdpSocket, QTcpServer, QTcpSocket, QHostAddress
+from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 
 from core.railway_system import RailwaySystem
 from core.tcp_server import RailwayTCPServer, BlockStatus
@@ -60,8 +60,10 @@ class MonitorView(QWidget):
         super().__init__()
         self.railway_system = railway_system
         self.settings_controller = settings_controller
-        self.tcp_server: RailwayTCPServer = None
-        self.listening = False
+        
+        # Initialize controller (MVC pattern)
+        from controllers.monitor_controller import MonitorController
+        self.controller = MonitorController(railway_system)
         
         self.setup_ui()
         self.connect_signals()
@@ -176,25 +178,47 @@ class MonitorView(QWidget):
         port_layout.addWidget(self.port_spin)
         network_content.addLayout(port_layout)
         
+        # Bind address selection
+        bind_layout = QHBoxLayout()
+        bind_label = QLabel("Bind to:")
+        bind_label.setStyleSheet("color: #2D3748; font-weight: 600;")
+        bind_layout.addWidget(bind_label)
+        
+        self.bind_address_input = QLineEdit()
+        self.bind_address_input.setPlaceholderText("0.0.0.0 (all interfaces)")
+        self.bind_address_input.setText("0.0.0.0")
+        self.bind_address_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #F7FAFC;
+                border: 2px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #2D3748;
+            }
+        """)
+        self.bind_address_input.setToolTip("IP address to bind to (0.0.0.0 = all interfaces)")
+        bind_layout.addWidget(self.bind_address_input)
+        network_content.addLayout(bind_layout)
+        
         # Server address info
-        self.server_address_label = QLabel("Server will listen on: 0.0.0.0 (all interfaces)")
-        self.server_address_label.setStyleSheet("color: #4A5568; font-size: 10px; padding: 5px;")
-        self.server_address_label.setWordWrap(True)
-        network_content.addWidget(self.server_address_label)
+        # self.server_address_label = QLabel("💡 Use 0.0.0.0 to accept connections from any IP, or specify a specific interface")
+        # self.server_address_label.setStyleSheet("color: #4A5568; font-size: 10px; padding: 5px;")
+        # self.server_address_label.setWordWrap(True)
+        # network_content.addWidget(self.server_address_label)
         
         # Host IP addresses (for Docker connection)
-        self.host_ip_label = QLabel("")
-        self.host_ip_label.setStyleSheet("""
-            color: #2D3748; 
-            font-size: 11px; 
-            background-color: #EDF2F7;
-            border-radius: 6px;
-            padding: 8px;
-            font-family: 'Courier New', monospace;
-        """)
-        self.host_ip_label.setWordWrap(True)
-        self.host_ip_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        network_content.addWidget(self.host_ip_label)
+        # self.host_ip_label = QLabel("")
+        # self.host_ip_label.setStyleSheet("""
+        #     color: #2D3748; 
+        #     font-size: 11px; 
+        #     background-color: #EDF2F7;
+        #     border-radius: 6px;
+        #     padding: 8px;
+        #     font-family: 'Courier New', monospace;
+        # """)
+        # self.host_ip_label.setWordWrap(True)
+        # self.host_ip_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # network_content.addWidget(self.host_ip_label)
         self.update_host_ip_display()
         
         # Connected clients label
@@ -400,8 +424,16 @@ class MonitorView(QWidget):
         """
         
     def connect_signals(self):
-        """Connect railway system signals"""
+        """Connect signals - View listens to Controller and Model"""
+        # Listen to Model (RailwaySystem) for data changes
         self.railway_system.block_color_changed.connect(self.on_block_color_changed)
+        
+        # Listen to Controller for business logic events
+        self.controller.log_message.connect(self.append_log)
+        self.controller.tcp_server_started.connect(self.on_tcp_server_started)
+        self.controller.tcp_server_stopped.connect(self.on_tcp_server_stopped)
+        self.controller.tcp_server_error.connect(self.on_tcp_server_error)
+        self.controller.client_count_changed.connect(self.on_client_count_changed)
         
         # Connect settings controller signals
         if self.settings_controller:
@@ -438,84 +470,69 @@ class MonitorView(QWidget):
             except:
                 pass
             
-            # Display the IP addresses
-            if ip_addresses:
-                ip_text = "🔗 <b>Connect from Docker using:</b><br>"
-                for label, ip in ip_addresses:
-                    ip_text += f"• {ip}:{self.port_spin.value()}<br>"
-                ip_text += "<br><small>Copy and use in your Docker container</small>"
-                self.host_ip_label.setText(ip_text)
-            else:
-                self.host_ip_label.setText("⚠️ Could not detect IP addresses")
+            # # Display the IP addresses
+            # if ip_addresses:
+            #     ip_text = "🔗 <b>Connect from Docker using:</b><br>"
+            #     for label, ip in ip_addresses:
+            #         ip_text += f"• {ip}:{self.port_spin.value()}<br>"
+            #     ip_text += "<br><small>Copy and use in your Docker container</small>"
+            #     self.host_ip_label.setText(ip_text)
+            # else:
+            #     self.host_ip_label.setText("⚠️ Could not detect IP addresses")
                 
         except Exception as e:
             self.host_ip_label.setText(f"⚠️ Error detecting IP: {str(e)}")
         
     def start_network_listener(self):
-        """Start the TCP server"""
-        if self.listening:
-            return
-            
+        """Delegate to controller to start TCP server (View only triggers action)"""
         port = self.port_spin.value()
-        
-        # Create and configure TCP server
-        self.tcp_server = RailwayTCPServer(port=port, host="0.0.0.0")
-        
-        # Connect signals
-        self.tcp_server.log_message.connect(self.log)
-        self.tcp_server.error_occurred.connect(lambda msg: self.log(f"❌ {msg}"))
-        self.tcp_server.client_connected.connect(self.on_client_connected)
-        self.tcp_server.client_disconnected.connect(self.on_client_disconnected)
-        self.tcp_server.block_status_update.connect(self.on_block_status_update)
-        self.tcp_server.batch_status_update.connect(self.on_batch_status_update)
-        
-        # Start server
-        if self.tcp_server.start():
-            self.listening = True
-            self.start_btn.setText("⏸ Stop Server")
-            self.start_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #E53E3E;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 10px;
-                    font-weight: 600;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background-color: #C53030;
-                }
-            """)
-            self.status_label.setText(f"● Server running on port {port}")
-            self.status_label.setStyleSheet("""
-                padding: 8px;
-                background-color: #F0FFF4;
-                color: #22543D;
-                border-radius: 6px;
-                font-weight: 600;
-            """)
-            self.port_spin.setEnabled(False)
-            
-            # Update IP display
-            self.update_host_ip_display()
-            
-            self.log(f"🟢 TCP Server started on 0.0.0.0:{port}")
-            self.log(f"📡 Accepting connections from any IP address")
-        else:
-            self.tcp_server = None
-            self.log(f"❌ Failed to start TCP server on port {port}")
+        bind_address = self.bind_address_input.text().strip() or "0.0.0.0"
+        self.controller.start_tcp_server(port=port, host=bind_address)
         
     def stop_network_listener(self):
-        """Stop the TCP server"""
-        if not self.listening:
-            return
-            
-        if self.tcp_server:
-            self.tcp_server.stop()
-            self.tcp_server = None
-            
-        self.listening = False
+        """Delegate to controller to stop TCP server (View only triggers action)"""
+        self.controller.stop_tcp_server()
+        
+    def toggle_listening(self):
+        """Toggle TCP server (View only triggers action)"""
+        if self.controller.is_listening:
+            self.stop_network_listener()
+        else:
+            self.start_network_listener()
+    
+    # Controller Event Handlers (View responds to Controller events)
+    # ---------------------------------------------------------------
+    
+    def on_tcp_server_started(self, port: int):
+        """Handle TCP server started event from controller"""
+        self.start_btn.setText("⏸ Stop Server")
+        self.start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E53E3E;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                font-weight: 600;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #C53030;
+            }
+        """)
+        self.status_label.setText(f"● Server running on port {port}")
+        self.status_label.setStyleSheet("""
+            padding: 8px;
+            background-color: #F0FFF4;
+            color: #22543D;
+            border-radius: 6px;
+            font-weight: 600;
+        """)
+        self.port_spin.setEnabled(False)
+        self.update_host_ip_display()
+    
+    def on_tcp_server_stopped(self):
+        """Handle TCP server stopped event from controller"""
         self.start_btn.setText("▶ Start Server")
         self.start_btn.setStyleSheet("""
             QPushButton {
@@ -541,68 +558,15 @@ class MonitorView(QWidget):
         """)
         self.port_spin.setEnabled(True)
         self.clients_label.setText("Connected clients: 0")
-        
-        self.log("🔴 TCP Server stopped")
-        
-    def toggle_listening(self):
-        """Toggle TCP server"""
-        if self.listening:
-            self.stop_network_listener()
-        else:
-            self.start_network_listener()
     
-    def on_client_connected(self, client_id: str):
-        """Handle new client connection"""
-        if self.tcp_server:
-            client_count = len(self.tcp_server.get_connected_clients())
-            self.clients_label.setText(f"Connected clients: {client_count}")
+    def on_tcp_server_error(self, error_msg: str):
+        """Handle TCP server error from controller"""
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.warning(self, "TCP Server Error", error_msg)
     
-    def on_client_disconnected(self, client_id: str):
-        """Handle client disconnection"""
-        if self.tcp_server:
-            client_count = len(self.tcp_server.get_connected_clients())
-            self.clients_label.setText(f"Connected clients: {client_count}")
-    
-    def on_block_status_update(self, block_id: str, status: str):
-        """Handle single block status update from TCP server"""
-        # Get color for status
-        color = BlockStatus.get_color(status)
-        
-        # Update block color in railway system
-        if block_id in self.railway_system.blocks:
-            self.railway_system.set_block_color(block_id, color)
-            self.log(f"✓ {block_id} → {status} ({color})")
-        else:
-            # Try to find by block_id (BL001001) instead of rail_id
-            found = False
-            for rail_id, block in self.railway_system.blocks.items():
-                if hasattr(block, 'block_id') and block.block_id == block_id:
-                    self.railway_system.set_block_color(rail_id, color)
-                    self.log(f"✓ {block_id} (rail {rail_id}) → {status} ({color})")
-                    found = True
-                    break
-            
-            if not found:
-                self.log(f"⚠️ Block not found: {block_id}")
-    
-    def on_batch_status_update(self, updates: list):
-        """Handle batch status updates from TCP server"""
-        success_count = 0
-        for block_id, status in updates:
-            color = BlockStatus.get_color(status)
-            
-            if block_id in self.railway_system.blocks:
-                self.railway_system.set_block_color(block_id, color)
-                success_count += 1
-            else:
-                # Try to find by block_id (BL001001)
-                for rail_id, block in self.railway_system.blocks.items():
-                    if hasattr(block, 'block_id') and block.block_id == block_id:
-                        self.railway_system.set_block_color(rail_id, color)
-                        success_count += 1
-                        break
-        
-        self.log(f"✓ Batch update: {success_count}/{len(updates)} blocks updated")
+    def on_client_count_changed(self, count: int):
+        """Handle client count change from controller"""
+        self.clients_label.setText(f"Connected clients: {count}")
             
     def on_block_color_changed(self, block_id: str, color: str):
         """Handle block color change"""
@@ -612,35 +576,24 @@ class MonitorView(QWidget):
                 item.update()
                 break
                 
-    def test_color_change(self):
-        """Test color change manually"""
-        block_id = self.test_block_id.text().strip()
-        color = self.test_color.text().strip()
-        
-        if block_id and color:
-            self.apply_color_update(block_id, color)
-        else:
-            self.log("⚠️ Please enter both block ID and color")
+    # These methods are commented out as they're not used in current UI
+    # def test_color_change(self):
+    #     """Test color change manually (delegate to controller)"""
+    #     block_id = self.test_block_id.text().strip()
+    #     color = self.test_color.text().strip()
+    #     self.controller.test_color_change(block_id, color)
             
-    def reset_colors(self):
-        """Reset all block colors to default"""
-        count = 0
-        for block_id in self.railway_system.blocks:
-            self.railway_system.set_block_color(block_id, '#888888')
-            count += 1
-        self.log(f"↻ Reset {count} blocks to default color")
+    # def reset_colors(self):
+    #     """Reset all block colors to default (delegate to controller)"""
+    #     self.controller.reset_all_colors()
         
-    def log(self, message: str):
-        """Add message to log"""
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_text.append(f"[{timestamp}] {message}")
+    def append_log(self, message: str):
+        """Add message to log (View only displays, message formatting done in Controller)"""
+        self.log_text.append(message)
     
     def load_layout(self):
-        """Load a layout from file"""
+        """Load a layout from file (View only handles UI, Controller handles logic)"""
         from PySide6.QtWidgets import QFileDialog, QMessageBox
-        import json
-        from core.json_formatter import RailwayJSONFormatter
         
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -650,53 +603,33 @@ class MonitorView(QWidget):
         )
         
         if file_path:
-            try:
-                with open(file_path, 'r') as f:
-                    data = json.load(f)
-                    
-                    # Check if it's the new blockGroups format or old format
-                    if "blockGroups" in data:
-                        # New format
-                        formatter = RailwayJSONFormatter(self.railway_system)
-                        formatter.from_blockgroups_json(data)
-                    else:
-                        # Old format (backward compatibility)
-                        self.railway_system.load_from_json(data)
-                    
-                    self.refresh()
-                    
-                    # Count blocks
-                    block_count = len(self.railway_system.blocks)
-                    self.log(f"✓ Loaded layout with {block_count} blocks")
-                    
-                    QMessageBox.information(
-                        self,
-                        "✓ Success",
-                        f"Layout loaded successfully!\n{block_count} blocks loaded."
-                    )
-            except Exception as e:
-                import traceback
-                error_details = traceback.format_exc()
-                self.log(f"❌ Failed to load layout: {str(e)}")
-                QMessageBox.critical(
-                    self,
-                    "❌ Error",
-                    f"Failed to load layout:\n{str(e)}"
-                )
+            # Delegate to controller
+            success, message, block_count = self.controller.load_layout(file_path)
+            
+            if success:
+                self.refresh()
+                QMessageBox.information(self, "✓ Success", message)
+            else:
+                QMessageBox.critical(self, "❌ Error", message)
         
     def apply_network_settings(self, settings: dict):
         """Apply network settings from settings controller"""
-        # Update TCP port (check both tcp_port and udp_port for backward compatibility)
-        port = settings.get('tcp_port') or settings.get('udp_port')
-        if port:
-            self.port_spin.setValue(port)
-            self.log(f"📡 Network settings updated: Port {port}")
+        # Update TCP port
+        port = settings.get('tcp_port', 5555)
+        self.port_spin.setValue(port)
+        
+        # Update bind address
+        bind_address = settings.get('tcp_bind_address', '0.0.0.0')
+        self.bind_address_input.setText(bind_address)
+        
+        # Log the update (only if log widget exists)
+        if hasattr(self, 'log_text'):
+            self.append_log(f"📡 Network settings updated: Port {port}, Bind address {bind_address}")
         
         # If currently listening, restart with new settings
-        if self.listening:
-            self.log("🔄 Restarting TCP server with new settings...")
-            self.stop_network_listener()
-            self.start_network_listener()
+        if self.controller.is_listening:
+            self.controller.stop_tcp_server()
+            self.controller.start_tcp_server(port=port, host=bind_address)
     
     def refresh(self):
         """Refresh the view from railway system"""
@@ -711,6 +644,7 @@ class MonitorView(QWidget):
             self.scene.addItem(graphics_item)
             
     def closeEvent(self, event):
-        """Handle widget close"""
-        self.stop_network_listener()
+        """Handle widget close (cleanup through controller)"""
+        if self.controller.is_listening:
+            self.controller.stop_tcp_server()
         super().closeEvent(event)

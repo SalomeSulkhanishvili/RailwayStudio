@@ -1,35 +1,24 @@
-# TCP Integration Guide for Docker Containers
+# TCP Integration Reference
 
-This guide explains how to integrate your Docker containers with railwayStudio using TCP communication to send real-time railway block status updates.
+Complete reference for the RailwayStudio TCP protocol.
 
-## Overview
+> **Quick Start?** See [TCP_QUICKSTART.md](TCP_QUICKSTART.md) for a 5-minute setup guide.
 
-RailwayStudio includes a built-in TCP server that receives block status updates from external systems (like Docker containers running railway control logic). The server listens for JSON-formatted messages and automatically updates the visual representation of railway blocks based on their status.
-
-## Connection Details
+## Protocol Overview
 
 - **Protocol**: TCP
-- **Default Port**: 5555 (configurable in the Monitor view)
-- **Host**: localhost / 127.0.0.1 (when Docker and railwayStudio are on the same PC)
-- **Format**: JSON messages, one per line (newline-delimited)
+- **Default Port**: 5555 (configurable)
+- **Format**: Newline-delimited JSON (`\n` terminated)
+- **Encoding**: UTF-8
+- **Connection**: Persistent (keep-alive recommended)
 
-## Block Status Types
+## Message Types
 
-The following status types are supported:
+### 1. Status Update
 
-| Status    | Description                          | Color   | Hex Code  |
-|-----------|--------------------------------------|---------|-----------|
-| `free`    | Block is free/available              | Green   | #48BB78   |
-| `reserved`| Block is reserved for a train        | Orange  | #FFA500   |
-| `blocked` | Block is occupied/blocked            | Red     | #E53E3E   |
-| `unknown` | Block status is unknown              | Gray    | #888888   |
+Update a single block's status.
 
-## Message Protocol
-
-### 1. Single Block Status Update
-
-Send a single status update for one block:
-
+**Request:**
 ```json
 {
   "type": "status_update",
@@ -39,11 +28,9 @@ Send a single status update for one block:
 ```
 
 **Fields:**
-- `type`: Must be `"status_update"` (optional, defaults to this)
-- `block_id`: **The external Block ID** (e.g., `BL001001`, `BL001002`)
-  - **Recommended**: Use BL IDs from your JSON layout file
-  - Internal rail IDs (`rail_0001`) also work but should be avoided
-- `status`: One of: `free`, `reserved`, `blocked`, `unknown`
+- `type`: `"status_update"` (optional, default)
+- `block_id`: External Block ID (e.g., `BL001001`)
+- `status`: `"free"`, `"reserved"`, `"blocked"`, or `"unknown"`
 
 **Response:**
 ```json
@@ -54,10 +41,11 @@ Send a single status update for one block:
 }
 ```
 
-### 2. Batch Status Update
+### 2. Batch Update
 
-Send multiple status updates in a single message:
+Update multiple blocks in one message.
 
+**Request:**
 ```json
 {
   "type": "batch_update",
@@ -69,10 +57,6 @@ Send multiple status updates in a single message:
 }
 ```
 
-**Fields:**
-- `type`: Must be `"batch_update"`
-- `updates`: Array of update objects, each containing `block_id` and `status`
-
 **Response:**
 ```json
 {
@@ -82,10 +66,11 @@ Send multiple status updates in a single message:
 }
 ```
 
-### 3. Ping/Pong (Connection Testing)
+### 3. Ping/Pong
 
-Test the connection:
+Test connection health.
 
+**Request:**
 ```json
 {
   "type": "ping",
@@ -101,196 +86,158 @@ Test the connection:
 }
 ```
 
-## Message Format Requirements
+## Status Types & Colors
 
-1. **Newline-Delimited**: Each JSON message must be on a single line, terminated with `\n`
-2. **Valid JSON**: Messages must be valid JSON
-3. **UTF-8 Encoding**: All messages must be UTF-8 encoded
-4. **Persistent Connection**: Keep the TCP connection open for continuous updates
+| Status     | Description          | Color  | Hex     |
+|------------|---------------------|--------|---------|
+| `free`     | Block available     | Green  | #48BB78 |
+| `reserved` | Reserved for train  | Orange | #FFA500 |
+| `blocked`  | Occupied            | Red    | #E53E3E |
+| `unknown`  | Unknown/error state | Gray   | #888888 |
 
 ## Connection Flow
 
-1. **Connect**: Client connects to railwayStudio TCP server
-2. **Welcome**: Server sends welcome message with client ID and protocol version
-3. **Send Updates**: Client sends status updates as needed
-4. **Receive ACKs**: Server acknowledges each message
-5. **Disconnect**: Client can close connection when done
+1. **Client connects** to server (e.g., `192.168.1.100:5555`)
+2. **Server sends welcome:**
+   ```json
+   {
+     "type": "welcome",
+     "message": "Connected to RailwayStudio TCP Server",
+     "client_id": "client_1",
+     "protocol_version": "1.0"
+   }
+   ```
+3. **Client sends updates** (status_update or batch_update)
+4. **Server acknowledges** each message
+5. **Client disconnects** when done (or keeps connection alive)
 
-### Welcome Message
+## Block ID Requirements
 
-When you first connect, the server sends:
+**Use External Block IDs:**
+- Format: `BL001001`, `BL002001`, etc.
+- Found in your JSON layout under `blockGroups[].blocks[].blockId`
+- Displayed above rails in Editor/Monitor views
+- Generated by "Auto-Create Groups" in Editor
 
-```json
-{
-  "type": "welcome",
-  "message": "Connected to RailwayStudio TCP Server",
-  "client_id": "client_1",
-  "protocol_version": "1.0"
-}
+**Don't use Internal Rail IDs:**
+- Format: `rail_0001`, `rail_0002`
+- Internal implementation details
+- Not exported to JSON
+- May change between sessions
+
+## Message Format Rules
+
+1. **One message per line** - terminated with `\n`
+2. **Valid JSON** - use `json.dumps()` or equivalent
+3. **UTF-8 encoding**
+4. **No empty messages**
+
+**Correct:**
+```python
+message = json.dumps(update) + '\n'
+sock.send(message.encode('utf-8'))
 ```
 
-## Python Example (for Docker Containers)
+**Incorrect:**
+```python
+# Missing newline
+sock.send(json.dumps(update).encode('utf-8'))  # ❌
 
-See `examples/docker_tcp_client.py` for a complete working example.
+# Multiple messages without delimiters
+sock.send(json.dumps(msg1) + json.dumps(msg2))  # ❌
+```
 
-### Quick Example
+## Error Handling
+
+The server handles errors gracefully:
+- Invalid JSON → Logs error, keeps connection open
+- Unknown block ID → Logs warning, sends ACK
+- Missing fields → Logs error, keeps connection open
+- Invalid status → Logs error, keeps connection open
+
+**The connection is never closed due to malformed messages.**
+
+Check the Network Log in Monitor view for detailed error messages.
+
+## Performance Tips
+
+1. **Use batch updates** for multiple blocks (more efficient)
+2. **Keep connection alive** (don't reconnect for each update)
+3. **Server handles 100+ updates/second** easily
+4. **No rate limiting** currently implemented
+
+## Python Example
 
 ```python
 import socket
 import json
 import time
 
-# Connect to railwayStudio
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('localhost', 5555))
+class RailwayClient:
+    def __init__(self, host, port):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((host, port))
+        # Read welcome
+        welcome = self.sock.recv(1024).decode('utf-8')
+        print(welcome)
+    
+    def update_block(self, block_id, status):
+        msg = {
+            "type": "status_update",
+            "block_id": block_id,
+            "status": status
+        }
+        self.sock.send((json.dumps(msg) + '\n').encode('utf-8'))
+        response = self.sock.recv(1024).decode('utf-8')
+        return json.loads(response)
+    
+    def update_batch(self, updates):
+        msg = {
+            "type": "batch_update",
+            "updates": updates
+        }
+        self.sock.send((json.dumps(msg) + '\n').encode('utf-8'))
+        response = self.sock.recv(1024).decode('utf-8')
+        return json.loads(response)
+    
+    def close(self):
+        self.sock.close()
 
-# Read welcome message
-welcome = sock.recv(1024).decode('utf-8')
-print(f"Connected: {welcome}")
-
-# Send a status update
-# IMPORTANT: Use Block IDs (BL00X00X) from your JSON layout file
-update = {
-    "type": "status_update",
-    "block_id": "BL001001",  # External Block ID
-    "status": "blocked"
-}
-message = json.dumps(update) + '\n'
-sock.send(message.encode('utf-8'))
-
-# Read acknowledgment
-response = sock.recv(1024).decode('utf-8')
-print(f"Response: {response}")
-
-# Close connection
-sock.close()
+# Usage
+client = RailwayClient('192.168.1.100', 5555)
+client.update_block('BL001001', 'blocked')
+client.update_batch([
+    {"block_id": "BL001002", "status": "reserved"},
+    {"block_id": "BL001003", "status": "free"}
+])
+client.close()
 ```
 
-## Docker Networking
+## Network Configuration
 
-Since Docker and railwayStudio are on the same PC:
+The server binds to the address configured in Settings (default: `0.0.0.0` = all interfaces).
 
-### Option 1: Host Network Mode (Simplest)
+**In Settings:**
+- TCP Port: Default 5555
+- TCP Bind Address: 
+  - `0.0.0.0` = Accept from any IP (recommended for Docker)
+  - Specific IP = Only accept on that interface
 
-Run your Docker container with `--network host`:
+**In Monitor:**
+- Temporarily override bind address for testing
+- Auto-detects and displays your host IPs
 
-```bash
-docker run --network host your-railway-container
-```
+## Security Considerations
 
-Then connect to `localhost:5555` from inside the container.
+- **No authentication** currently implemented
+- **No encryption** (plain TCP)
+- Server binds to all interfaces by default
+- Use firewall rules to restrict access if needed
+- Consider running on isolated network for production
 
-### Option 2: Bridge Network (Default)
+## See Also
 
-Connect to the host machine's IP:
-
-```python
-# From inside Docker container
-sock.connect(('host.docker.internal', 5555))  # On Mac/Windows
-# OR
-sock.connect(('172.17.0.1', 5555))  # On Linux (Docker bridge gateway)
-```
-
-### Option 3: Custom Network
-
-Create a custom Docker network and use the host's IP address within that network.
-
-## Block ID Formats
-
-The TCP server accepts two types of block identifiers:
-
-1. **External Block ID** (Recommended): `BL001001`, `BL001002`, etc.
-   - These are generated when you run "Auto-Create Groups" in the Editor
-   - These IDs appear in your JSON layout file under `blockGroups`
-   - These are visible above each rail in the Editor/Monitor views
-   - **Use these IDs in your Docker containers**
-
-2. **Internal Rail ID** (Not Recommended): `rail_0001`, `rail_0002`, etc.
-   - These are internal identifiers used by railwayStudio
-   - Not exposed in JSON exports
-   - Should only be used for debugging
-
-The server will automatically search for both formats, but **you should always use External Block IDs (BL00X00X)** in your Docker containers.
-
-### How to Get Block IDs
-
-1. **In the Editor**: Click "Auto-Create Groups" - this generates BL IDs
-2. **Visually**: Block IDs are displayed above each rail segment
-3. **In JSON**: Open your layout file and look for:
-   ```json
-   "blockGroups": [
-     {
-       "groupId": "G001",
-       "blocks": [
-         {
-           "blockId": "BL001001",
-           "rails": ["rail_0001", "rail_0002"]
-         }
-       ]
-     }
-   ]
-   ```
-4. **Use the `blockId` values** in your TCP messages
-
-## Error Handling
-
-If the server receives an invalid message, it will:
-- Log the error in the Network Log
-- **NOT** close the connection
-- Continue accepting new messages
-
-Common errors:
-- Missing `block_id` or `status` field
-- Invalid status value (not one of: free, reserved, blocked, unknown)
-- Malformed JSON
-- Unknown block ID (block not found in current layout)
-
-## Testing
-
-1. **Start railwayStudio**
-2. **Load a layout** in the Monitor view
-3. **Click "Start Server"** (default port 5555)
-4. **Run the example client** from your Docker container
-5. **Watch blocks change color** in real-time
-
-## Troubleshooting
-
-### Connection Refused
-- Check that railwayStudio TCP server is running (green "Server running" status)
-- Verify the port number matches
-- Check firewall settings
-
-### Block Not Found
-- Ensure the layout is loaded in railwayStudio Monitor view
-- Run "Auto-Create Groups" in Editor to generate BL IDs
-- Verify the block_id matches exactly (case-sensitive)
-- **Use External Block IDs** (`BL001001`) from your JSON layout file
-- Check the Network Log for the exact error message
-
-### No Visual Update
-- Check the Network Log for error messages
-- Verify the status value is valid
-- Ensure the block exists in the current layout
-
-## Performance
-
-- **Batch Updates**: Use batch updates for better performance when updating multiple blocks
-- **Keep-Alive**: Maintain a persistent connection rather than reconnecting for each update
-- **Rate Limiting**: The server can handle hundreds of updates per second
-
-## Security Note
-
-The TCP server binds to `0.0.0.0` (all interfaces) by default. If you need to restrict access:
-- Use firewall rules to limit connections
-- Consider running railwayStudio and Docker on an isolated network
-- The protocol currently does not include authentication (add if needed)
-
-## Future Enhancements
-
-Planned features:
-- Bidirectional communication (railwayStudio → Docker)
-- Switch control messages
-- Signal control messages
-- Authentication/authorization
-- SSL/TLS support
-
+- [TCP_QUICKSTART.md](TCP_QUICKSTART.md) - 5-minute setup guide
+- [MVC_ARCHITECTURE.md](MVC_ARCHITECTURE.md) - Codebase architecture
+- `examples/docker_tcp_client.py` - Complete working example
+- `examples/extract_block_ids.py` - Extract Block IDs from layouts

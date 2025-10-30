@@ -97,7 +97,7 @@ class HomeView(QWidget):
         feature3_layout.addWidget(feature3_title)
         
         feature3_desc = QLabel(
-            "Connect to your railway control system via UDP network.\n"
+            "Connect to your railway control system via TCP network.\n"
             "See real-time updates of train positions and track status."
         )
         feature3_desc.setFont(QFont("Arial", 12))

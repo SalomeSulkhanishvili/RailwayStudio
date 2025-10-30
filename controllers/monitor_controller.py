@@ -5,28 +5,34 @@ Handles business logic for the railway monitor
 import json
 from datetime import datetime
 from typing import Callable, Optional
+from PySide6.QtCore import QObject, Signal
 
 from core.railway_system import RailwaySystem
 from core.json_formatter import RailwayJSONFormatter
+from core.tcp_server import RailwayTCPServer, BlockStatus
 
 
-class MonitorController:
-    """Controller for monitor operations"""
+class MonitorController(QObject):
+    """Controller for monitor operations - handles all business logic"""
+    
+    # Signals for View updates
+    tcp_server_started = Signal(int)  # port
+    tcp_server_stopped = Signal()
+    tcp_server_error = Signal(str)  # error_message
+    client_count_changed = Signal(int)  # client_count
+    log_message = Signal(str)  # message
     
     def __init__(self, railway_system: RailwaySystem):
+        super().__init__()
         self.railway_system = railway_system
         self.formatter = RailwayJSONFormatter(railway_system)
-        self.log_callback: Optional[Callable] = None
+        self.tcp_server: Optional[RailwayTCPServer] = None
+        self.is_listening = False
         
-    def set_log_callback(self, callback: Callable):
-        """Set callback for logging messages"""
-        self.log_callback = callback
-    
     def log(self, message: str):
         """Log a message"""
-        if self.log_callback:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            self.log_callback(f"[{timestamp}] {message}")
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_message.emit(f"[{timestamp}] {message}")
     
     def load_layout(self, file_path: str) -> tuple[bool, str, int]:
         """
@@ -133,4 +139,118 @@ class MonitorController:
     def get_available_blocks(self) -> list[str]:
         """Get list of available block IDs"""
         return list(self.railway_system.blocks.keys())
+    
+    # TCP Server Management
+    # ----------------------
+    
+    def start_tcp_server(self, port: int, host: str = "0.0.0.0") -> bool:
+        """
+        Start the TCP server
+        Returns: success
+        """
+        if self.is_listening:
+            self.log("⚠️ Server is already running")
+            return False
+        
+        # Create and configure TCP server
+        self.tcp_server = RailwayTCPServer(port=port, host=host)
+        
+        # Connect TCP server signals to controller methods
+        self.tcp_server.log_message.connect(self.log)
+        self.tcp_server.error_occurred.connect(self._on_tcp_error)
+        self.tcp_server.client_connected.connect(self._on_client_connected)
+        self.tcp_server.client_disconnected.connect(self._on_client_disconnected)
+        self.tcp_server.block_status_update.connect(self._on_block_status_update)
+        self.tcp_server.batch_status_update.connect(self._on_batch_status_update)
+        
+        # Start server
+        if self.tcp_server.start():
+            self.is_listening = True
+            self.log(f"🟢 TCP Server started on {host}:{port}")
+            self.log(f"📡 Accepting connections from any IP address")
+            self.tcp_server_started.emit(port)
+            return True
+        else:
+            self.tcp_server = None
+            self.log(f"❌ Failed to start TCP server on port {port}")
+            self.tcp_server_error.emit(f"Failed to start server on port {port}")
+            return False
+    
+    def stop_tcp_server(self):
+        """Stop the TCP server"""
+        if not self.is_listening:
+            return
+        
+        if self.tcp_server:
+            self.tcp_server.stop()
+            self.tcp_server = None
+        
+        self.is_listening = False
+        self.log("🔴 TCP Server stopped")
+        self.tcp_server_stopped.emit()
+        self.client_count_changed.emit(0)
+    
+    def get_connected_client_count(self) -> int:
+        """Get number of connected clients"""
+        if self.tcp_server:
+            return len(self.tcp_server.get_connected_clients())
+        return 0
+    
+    def _on_tcp_error(self, error_msg: str):
+        """Handle TCP server error"""
+        self.log(f"❌ {error_msg}")
+        self.tcp_server_error.emit(error_msg)
+    
+    def _on_client_connected(self, client_id: str):
+        """Handle new client connection"""
+        if self.tcp_server:
+            client_count = len(self.tcp_server.get_connected_clients())
+            self.client_count_changed.emit(client_count)
+    
+    def _on_client_disconnected(self, client_id: str):
+        """Handle client disconnection"""
+        if self.tcp_server:
+            client_count = len(self.tcp_server.get_connected_clients())
+            self.client_count_changed.emit(client_count)
+    
+    def _on_block_status_update(self, block_id: str, status: str):
+        """Handle single block status update from TCP server"""
+        # Get color for status
+        color = BlockStatus.get_color(status)
+        
+        # Update block color in railway system
+        if block_id in self.railway_system.blocks:
+            self.railway_system.set_block_color(block_id, color)
+            self.log(f"✓ {block_id} → {status} ({color})")
+        else:
+            # Try to find by block_id (BL001001) instead of rail_id
+            found = False
+            for rail_id, block in self.railway_system.blocks.items():
+                if hasattr(block, 'block_id') and block.block_id == block_id:
+                    self.railway_system.set_block_color(rail_id, color)
+                    self.log(f"✓ {block_id} (rail {rail_id}) → {status} ({color})")
+                    found = True
+                    break
+            
+            if not found:
+                self.log(f"⚠️ Block not found: {block_id}")
+    
+    def _on_batch_status_update(self, updates: list):
+        """Handle batch status updates from TCP server"""
+        success_count = 0
+        for block_id, status in updates:
+            color = BlockStatus.get_color(status)
+            
+            if block_id in self.railway_system.blocks:
+                self.railway_system.set_block_color(block_id, color)
+                success_count += 1
+            else:
+                # Try to find by block_id (BL001001)
+                for rail_id, block in self.railway_system.blocks.items():
+                    if hasattr(block, 'block_id') and block.block_id == block_id:
+                        self.railway_system.set_block_color(rail_id, color)
+                        success_count += 1
+                        break
+        
+        self.log(f"✓ Batch update: {success_count}/{len(updates)} blocks updated")
 

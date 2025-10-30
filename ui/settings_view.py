@@ -30,11 +30,8 @@ class SettingsView(QWidget):
                 'selected_color': '#FF0000',
                 'grid_size': 20,
                 'snap_distance': 30,
-                'udp_port': 5000,
-                'ip_address': '192.168.1.100',
-                'gateway': '192.168.1.1',
-                'subnet_mask': '255.255.255.0',
-                'dns_server': '8.8.8.8',
+                'tcp_port': 5555,
+                'tcp_bind_address': '0.0.0.0',
             }
         
         # Temporary settings (for preview before applying)
@@ -97,9 +94,9 @@ class SettingsView(QWidget):
         # editor_group = self.create_editor_settings_group()
         # scroll_layout.addWidget(editor_group)
         
-        # Ethernet Configuration Group (includes UDP port)
-        ethernet_group = self.create_ethernet_config_group()
-        scroll_layout.addWidget(ethernet_group)
+        # Network Configuration Group
+        network_group = self.create_network_settings_group()
+        scroll_layout.addWidget(network_group)
         
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
@@ -264,66 +261,33 @@ class SettingsView(QWidget):
         return card
         
     def create_network_settings_group(self):
-        """Create network settings group - placeholder for future network features"""
-        # This section is kept for potential future network monitoring settings
-        # UDP port has been moved to Ethernet Configuration
-        return None
+        """Create network settings group"""
+        card, main_layout, form_layout = self.create_card_group("Network Configuration", "🌐")
         
-    def create_ethernet_config_group(self):
-        """Create ethernet configuration group"""
-        card, main_layout, form_layout = self.create_card_group("Ethernet Configuration", "🔌")
+        # TCP Port
+        tcp_port_spin = QSpinBox()
+        tcp_port_spin.setRange(1024, 65535)
+        tcp_port_spin.setValue(self.temp_settings.get('tcp_port', 5555))
+        tcp_port_spin.setStyleSheet(self.get_input_style())
+        tcp_port_spin.valueChanged.connect(lambda v: self.update_temp_setting('tcp_port', v))
+        form_layout.addRow(self.create_label("TCP Port:"), tcp_port_spin)
+        self.input_fields['tcp_port'] = tcp_port_spin
         
-        # UDP Port (for monitoring)
-        port_spin = QSpinBox()
-        port_spin.setRange(1024, 65535)
-        port_spin.setValue(self.temp_settings['udp_port'])
-        port_spin.setStyleSheet(self.get_input_style())
-        port_spin.valueChanged.connect(lambda v: self.update_temp_setting('udp_port', v))
-        form_layout.addRow(self.create_label("UDP Port:"), port_spin)
-        self.input_fields['udp_port'] = port_spin
-        
-        # IP Address
-        ip_input = QLineEdit()
-        ip_input.setText(self.temp_settings['ip_address'])
-        ip_input.setPlaceholderText("192.168.1.100")
-        ip_input.setStyleSheet(self.get_input_style())
-        ip_input.textChanged.connect(lambda v: self.update_temp_setting('ip_address', v))
-        form_layout.addRow(self.create_label("IP Address:"), ip_input)
-        self.input_fields['ip_address'] = ip_input
-        
-        # Subnet Mask
-        subnet_input = QLineEdit()
-        subnet_input.setText(self.temp_settings['subnet_mask'])
-        subnet_input.setPlaceholderText("255.255.255.0")
-        subnet_input.setStyleSheet(self.get_input_style())
-        subnet_input.textChanged.connect(lambda v: self.update_temp_setting('subnet_mask', v))
-        form_layout.addRow(self.create_label("Subnet Mask:"), subnet_input)
-        self.input_fields['subnet_mask'] = subnet_input
-        
-        # Gateway
-        gateway_input = QLineEdit()
-        gateway_input.setText(self.temp_settings['gateway'])
-        gateway_input.setPlaceholderText("192.168.1.1")
-        gateway_input.setStyleSheet(self.get_input_style())
-        gateway_input.textChanged.connect(lambda v: self.update_temp_setting('gateway', v))
-        form_layout.addRow(self.create_label("Gateway:"), gateway_input)
-        self.input_fields['gateway'] = gateway_input
-        
-        # DNS Server
-        dns_input = QLineEdit()
-        dns_input.setText(self.temp_settings['dns_server'])
-        dns_input.setPlaceholderText("8.8.8.8")
-        dns_input.setStyleSheet(self.get_input_style())
-        dns_input.textChanged.connect(lambda v: self.update_temp_setting('dns_server', v))
-        form_layout.addRow(self.create_label("DNS Server:"), dns_input)
-        self.input_fields['dns_server'] = dns_input
+        # TCP Bind Address
+        tcp_bind_input = QLineEdit()
+        tcp_bind_input.setText(self.temp_settings.get('tcp_bind_address', '0.0.0.0'))
+        tcp_bind_input.setPlaceholderText("0.0.0.0 (all interfaces)")
+        tcp_bind_input.setStyleSheet(self.get_input_style())
+        tcp_bind_input.textChanged.connect(lambda v: self.update_temp_setting('tcp_bind_address', v))
+        form_layout.addRow(self.create_label("Bind Address:"), tcp_bind_input)
+        self.input_fields['tcp_bind_address'] = tcp_bind_input
         
         hint = QLabel(
-            "⚠️ These settings configure the application's network interface. "
-            "Changes will be applied when you click 'Apply Changes' button."
+            "💡 TCP server settings for receiving railway block status updates from Docker containers. "
+            "Use 0.0.0.0 to accept connections from any IP, or specify a specific interface."
         )
-        hint.setStyleSheet("color: #F59E0B; font-size: 11px; font-style: italic; padding: 10px; "
-                          "background-color: #FEF3C7; border-radius: 6px;")
+        hint.setStyleSheet("color: #2563EB; font-size: 11px; font-style: italic; padding: 10px; "
+                          "background-color: #DBEAFE; border-radius: 6px;")
         hint.setWordWrap(True)
         main_layout.addWidget(hint)
         
@@ -463,11 +427,8 @@ class SettingsView(QWidget):
                     'selected_color': '#4A90E2',
                     'grid_size': 20,
                     'snap_distance': 30,
-                    'udp_port': 5000,
-                    'ip_address': '192.168.1.100',
-                    'gateway': '192.168.1.1',
-                    'subnet_mask': '255.255.255.0',
-                    'dns_server': '8.8.8.8',
+                    'tcp_port': 5555,
+                    'tcp_bind_address': '0.0.0.0',
                 }
                 self.temp_settings = self.settings.copy()
             
@@ -477,18 +438,12 @@ class SettingsView(QWidget):
                 self.input_fields['grid_size'].setValue(self.settings['grid_size'])
             if 'snap_distance' in self.input_fields and 'snap_distance' in self.settings:
                 self.input_fields['snap_distance'].setValue(self.settings['snap_distance'])
-            if 'udp_port' in self.input_fields and 'udp_port' in self.settings:
-                self.input_fields['udp_port'].setValue(self.settings['udp_port'])
+            if 'tcp_port' in self.input_fields and 'tcp_port' in self.settings:
+                self.input_fields['tcp_port'].setValue(self.settings['tcp_port'])
             
             # Update line edits
-            if 'ip_address' in self.input_fields and 'ip_address' in self.settings:
-                self.input_fields['ip_address'].setText(self.settings['ip_address'])
-            if 'gateway' in self.input_fields and 'gateway' in self.settings:
-                self.input_fields['gateway'].setText(self.settings['gateway'])
-            if 'subnet_mask' in self.input_fields and 'subnet_mask' in self.settings:
-                self.input_fields['subnet_mask'].setText(self.settings['subnet_mask'])
-            if 'dns_server' in self.input_fields and 'dns_server' in self.settings:
-                self.input_fields['dns_server'].setText(self.settings['dns_server'])
+            if 'tcp_bind_address' in self.input_fields and 'tcp_bind_address' in self.settings:
+                self.input_fields['tcp_bind_address'].setText(self.settings['tcp_bind_address'])
             
             # Update color buttons with reset values
             for key, button in self.color_buttons.items():

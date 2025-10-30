@@ -32,11 +32,8 @@ class SettingsController(QObject):
             'connection_color': '#FF5252',
             
             # Network settings
-            'udp_port': 5000,
-            'ip_address': '192.168.1.100',
-            'subnet_mask': '255.255.255.0',
-            'gateway': '192.168.1.1',
-            'dns_server': '8.8.8.8',
+            'tcp_port': 5555,
+            'tcp_bind_address': '0.0.0.0',  # Bind to all interfaces by default
             
             # Editor settings
             'auto_save': False,
@@ -73,7 +70,7 @@ class SettingsController(QObject):
                 json.dump(settings, f, indent=2)
             
             # Check if network settings changed
-            network_keys = ['udp_port', 'ip_address', 'subnet_mask', 'gateway', 'dns_server']
+            network_keys = ['tcp_port', 'tcp_bind_address']
             network_changed = any(
                 self.settings.get(key) != settings.get(key) 
                 for key in network_keys
@@ -96,27 +93,17 @@ class SettingsController(QObject):
         Validate and apply settings
         Returns: (success, message)
         """
-        # Validate network settings
-        if 'udp_port' in new_settings:
-            port = new_settings['udp_port']
+        # Validate TCP port
+        if 'tcp_port' in new_settings:
+            port = new_settings['tcp_port']
             if not (1024 <= port <= 65535):
-                return False, "UDP port must be between 1024 and 65535"
+                return False, "TCP port must be between 1024 and 65535"
         
-        if 'ip_address' in new_settings:
-            if not self.validate_ip(new_settings['ip_address']):
-                return False, "Invalid IP address format"
-        
-        if 'subnet_mask' in new_settings:
-            if not self.validate_ip(new_settings['subnet_mask']):
-                return False, "Invalid subnet mask format"
-        
-        if 'gateway' in new_settings:
-            if not self.validate_ip(new_settings['gateway']):
-                return False, "Invalid gateway format"
-        
-        if 'dns_server' in new_settings:
-            if not self.validate_ip(new_settings['dns_server']):
-                return False, "Invalid DNS server format"
+        # Validate TCP bind address
+        if 'tcp_bind_address' in new_settings:
+            addr = new_settings['tcp_bind_address']
+            if addr != '0.0.0.0' and not self.validate_ip(addr):
+                return False, "Invalid TCP bind address format"
         
         # Save settings
         return self.save_settings(new_settings)

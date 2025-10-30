@@ -1,345 +1,157 @@
-# TCP Integration Quick Start Guide
+# TCP Quick Start Guide
 
-Get your Docker containers communicating with RailwayStudio in 5 minutes!
+Get your Docker container connected to RailwayStudio in 5 minutes.
 
-## Setup (One-Time)
+## Prerequisites
 
-### 1. Start RailwayStudio
+- RailwayStudio installed and running
+- A railway layout loaded with Block Groups created (click "Auto-Create Groups" in Editor)
+- Docker container on the same PC
 
+## Step 1: Start TCP Server
+
+1. Open RailwayStudio → **Monitor** tab
+2. Click **"Load Layout"** and select your `.json` layout file
+3. Set your TCP port (default: 5555) and bind address (default: 0.0.0.0)
+4. Click **"Start Server"**
+5. **Note the IP address** shown in "Connect from Docker using:" (e.g., `192.168.1.100:5555`)
+
+## Step 2: Get Your Block IDs
+
+Block IDs are in format `BL001001`, `BL002001`, etc.
+
+**Option A - From UI:**
+- Block IDs are displayed above each rail in the Editor/Monitor views
+
+**Option B - From JSON:**
 ```bash
-cd /path/to/railwayStudio
-python3 main.py
+# Extract all Block IDs from your layout
+cd examples
+python extract_block_ids.py ../layouts/your_layout.json
 ```
 
-### 2. Prepare Railway Layout
-
-1. Click **"Editor"** in the sidebar
-2. Design railway layout or load an existing one
-3. Click **"Auto-Create Groups"** to generate external Block IDs (`BL001001`, `BL001002`, etc.)
-4. **Save the layout** to a JSON file
-5. **Important**: Note the Block IDs displayed above each rail segment
-   - These are the external IDs in format `BL00X00X`
-   - These are also in your exported JSON file
-   - **Use these IDs in your Docker container**, not the internal `rail_00XX` IDs
-
-### 3. Start the TCP Server
-
-1. Click **"Monitor"** in the sidebar
-2. Set the TCP port (default: 5555)
-3. Click **"▶ Start Server"**
-4. Status should show: "● Server running on port 5555"
-5. **Important**: Note the IP address(es) shown in the "Connect from Docker using:" section
-   - Example: `192.168.1.100:5555`
-   - This is what you'll use in your Docker container
-
-## Test the Connection
-
-### From Host Machine (Quick Test)
-
-```bash
-cd railwayStudio
-python3 examples/docker_tcp_client.py
+**Option C - From Layout File:**
+```json
+"blockGroups": [
+  {
+    "blocks": [
+      {"blockId": "BL001001", ...},
+      {"blockId": "BL001002", ...}
+    ]
+  }
+]
 ```
 
-You should see:
-- Console output showing connection success
-- Block colors changing in the Monitor view
-- Network log showing received updates
+## Step 3: Connect from Docker
 
-### From Docker Container
-
-#### Option 1: Using the Example Script
-
-```bash
-# Copy example to your container
-docker cp examples/docker_tcp_client.py your_container:/app/
-
-# Run it
-docker exec your_container python3 /app/docker_tcp_client.py
-```
-
-#### Option 2: Integrate in Your Code
+### Python Example
 
 ```python
 import socket
 import json
 
-# Connect to RailwayStudio on host
+# Use the IP from Step 1
+HOST = '192.168.1.100'  # Your actual IP from Monitor view
+PORT = 5555
+
+# Connect
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((HOST, PORT))
 
-# OPTION 1 (Recommended): Use host machine's actual IP address
-# Check railwayStudio Monitor view for the IP address
-sock.connect(('192.168.1.100', 5555))  # Replace with your IP from Monitor view
+# Read welcome message
+welcome = sock.recv(1024).decode('utf-8')
+print(f"Connected: {welcome}")
 
-# OPTION 2: Use Docker special hostname (Mac/Windows)
-# sock.connect(('host.docker.internal', 5555))
-
-# OPTION 3: Use Docker bridge gateway (Linux)
-# sock.connect(('172.17.0.1', 5555))
-
-# Send block status update
-# IMPORTANT: Use external Block IDs (BL00X00X format)
+# Send status update
 update = {
     "type": "status_update",
-    "block_id": "BL001001",  # Use BL IDs from your JSON layout file
-    "status": "blocked"
+    "block_id": "BL001001",  # Use your Block ID from Step 2
+    "status": "blocked"      # free, reserved, blocked, or unknown
 }
 sock.send((json.dumps(update) + '\n').encode('utf-8'))
 
-# Close
+# Read response
+response = sock.recv(1024).decode('utf-8')
+print(f"Response: {response}")
+
 sock.close()
 ```
 
-## Finding Your Block IDs
+### Docker Connection Options
 
-After creating groups in the Editor:
-
-1. **Visual**: Look at the railway layout - Block IDs are displayed above each rail
-2. **JSON File**: Open your saved layout file and find the `blockGroups` section:
-   ```json
-   "blockGroups": [
-     {
-       "groupId": "G001",
-       "blocks": [
-         {"blockId": "BL001001", ...},
-         {"blockId": "BL001002", ...}
-       ]
-     }
-   ]
-   ```
-3. **Use these `BL00X00X` IDs** in your Docker TCP messages
-
-## Block Status Values
-
-Send one of these status values:
-
-| Status      | Color   | Use Case                    |
-|-------------|---------|----------------------------|
-| `"free"`    | Green   | Block is available          |
-| `"reserved"`| Orange  | Block reserved for train    |
-| `"blocked"` | Red     | Block occupied by train     |
-| `"unknown"` | Gray    | Status cannot be determined |
-
-## Message Format
-
-### Single Block Update
-
-```json
-{
-  "type": "status_update",
-  "block_id": "BL001001",
-  "status": "blocked"
-}
-```
-
-**Use External Block IDs**: Use the `BL00X00X` format (not `rail_00XX`). These are the IDs visible in your railway layout and exported in JSON files.
-
-### Multiple Blocks (Batch)
-
-```json
-{
-  "type": "batch_update",
-  "updates": [
-    {"block_id": "BL001001", "status": "blocked"},
-    {"block_id": "BL001002", "status": "reserved"},
-    {"block_id": "BL001003", "status": "free"}
-  ]
-}
-```
-
-**Important**: 
-- Each JSON message must end with `\n` (newline)!
-- Use **external Block IDs** (`BL001001`) that match your JSON layout file
-- Internal IDs (`rail_0001`) also work but are not recommended
-
-## Docker Network Configuration
-
-### Option 1: Use Host Machine's IP Address (Recommended)
-
-**Best for when Docker and railwayStudio are on the same PC:**
-
-1. Start railwayStudio TCP server
-2. Check the Monitor view - it will show your IP address (e.g., `192.168.1.100:5555`)
-3. Use that IP in your Docker container:
-
+**Option 1: Use actual IP (Recommended)**
 ```python
-# Use the IP shown in railwayStudio Monitor view
-sock.connect(('192.168.1.100', 5555))  # Replace with your actual IP
+sock.connect(('192.168.1.100', 5555))  # From Monitor view
 ```
 
-**How to find your IP manually:**
+**Option 2: Host network mode**
 ```bash
-# macOS/Linux
-ifconfig | grep "inet " | grep -v 127.0.0.1
-
-# Windows
-ipconfig | findstr IPv4
+docker run --network host your-container
+```
+```python
+sock.connect(('localhost', 5555))
 ```
 
-### Option 2: Host Network Mode
-
-Container shares host network (won't work on Mac/Windows Docker Desktop):
-
-```bash
-docker run --network host your-image
-# Connect to localhost:5555 from inside container
-```
-
-### Option 3: Docker Special Hostnames
-
-**Mac/Windows Docker Desktop:**
+**Option 3: host.docker.internal (Mac/Windows)**
 ```python
 sock.connect(('host.docker.internal', 5555))
 ```
 
-**Linux:**
+## Step 4: Test It
+
+1. Run your Docker container with the code from Step 3
+2. Watch the block change color in RailwayStudio Monitor view
+3. Check the Network Log for confirmation messages
+
+## Block Statuses
+
+| Status     | Color  | When to Use                |
+|------------|--------|----------------------------|
+| `free`     | Green  | Block is available         |
+| `reserved` | Orange | Block reserved for train   |
+| `blocked`  | Red    | Block occupied             |
+| `unknown`  | Gray   | Status unknown/error       |
+
+## Batch Updates
+
+Update multiple blocks at once:
+
 ```python
-sock.connect(('172.17.0.1', 5555))  # Docker bridge gateway
+batch = {
+    "type": "batch_update",
+    "updates": [
+        {"block_id": "BL001001", "status": "blocked"},
+        {"block_id": "BL001002", "status": "reserved"},
+        {"block_id": "BL001003", "status": "free"}
+    ]
+}
+sock.send((json.dumps(batch) + '\n').encode('utf-8'))
 ```
 
 ## Troubleshooting
 
 ### "Connection refused"
-
-✅ **Check:**
-1. RailwayStudio is running
-2. Monitor view is open
-3. TCP server is started (green status)
-4. Port number matches (default: 5555)
-5. Firewall allows connection
+- Make sure TCP server is started (green "Server running" in Monitor)
+- Check you're using the correct IP and port
+- Verify firewall isn't blocking the connection
 
 ### "Block not found"
+- Make sure you clicked "Auto-Create Groups" in Editor
+- Use Block IDs (BL001001) from your layout, NOT rail IDs (rail_0001)
+- Check the Network Log for the exact error
 
-✅ **Check:**
-1. Layout is loaded in Monitor view
-2. You ran "Auto-Create Groups" in Editor (this generates BL IDs)
-3. Block ID matches exactly (case-sensitive): use `BL001001` not `bl001001`
-4. The Block ID exists in your loaded layout (check the JSON file or look at the rails in Monitor view)
-5. Check Network Log in Monitor view for the exact error message
+### Docker can't reach host
+- Try using the actual IP shown in Monitor view
+- On Linux, try `172.17.0.1` (Docker bridge IP)
+- On Mac/Windows, try `host.docker.internal`
+- Or use `--network host` when running Docker
 
-### No visual update
+## Complete Example
 
-✅ **Check:**
-1. Status value is valid: `free`, `reserved`, `blocked`, or `unknown`
-2. JSON format is correct (use a JSON validator)
-3. Message ends with `\n` (newline)
-4. Check Network Log for errors
-
-### Docker can't connect to host
-
-✅ **Try in this order:**
-
-**1. Use the actual IP address shown in railwayStudio Monitor view:**
-```python
-sock.connect(('192.168.1.100', 5555))  # Replace with your IP
-```
-
-**2. Mac/Windows - Try Docker special hostname:**
-```python
-sock.connect(('host.docker.internal', 5555))
-```
-
-**3. Linux - Try Docker bridge gateway:**
-```python
-sock.connect(('172.17.0.1', 5555))
-```
-
-**4. Find your IP manually:**
-```bash
-# macOS/Linux
-ifconfig | grep "inet " | grep -v 127.0.0.1
-
-# Windows  
-ipconfig | findstr IPv4
-```
-
-**5. Or use host network (Linux only):**
-```bash
-docker run --network host your-image
-sock.connect(('localhost', 5555))
-```
-
-## Real-World Integration
-
-### From Your Railway Controller
-
-```python
-import socket
-import json
-import time
-
-class RailwayStudioClient:
-    def __init__(self, host='192.168.1.100', port=5555):  # Use your actual IP
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
-        
-    def update_block(self, block_id, status):
-        msg = {"type": "status_update", "block_id": block_id, "status": status}
-        self.sock.send((json.dumps(msg) + '\n').encode('utf-8'))
-    
-    def close(self):
-        self.sock.close()
-
-# Use in your railway logic
-# IMPORTANT: Load Block IDs from your JSON layout file
-studio = RailwayStudioClient()
-
-# When train enters block (use BL IDs from your layout)
-studio.update_block("BL001001", "blocked")
-
-# When train leaves block
-studio.update_block("BL001001", "free")
-
-# When reserving block
-studio.update_block("BL001002", "reserved")
-
-studio.close()
-```
-
-### Continuous Monitoring Loop
-
-```python
-import time
-
-studio = RailwayStudioClient()
-
-try:
-    while True:
-        # Read block statuses from your microcontrollers
-        block_status = read_from_microcontroller()
-        
-        # Send to RailwayStudio
-        studio.update_block(block_status['id'], block_status['status'])
-        
-        time.sleep(0.1)  # 10 updates/second
-        
-except KeyboardInterrupt:
-    studio.close()
-```
+See `examples/docker_tcp_client.py` for a full working example with multiple demo modes.
 
 ## Next Steps
 
-📚 **Read the full documentation:**
-- [TCP Integration Guide](TCP_INTEGRATION.md) - Complete protocol reference
-- [Usage Guide](USAGE.md) - How to use RailwayStudio
-
-🔧 **Customize:**
-- Modify `examples/docker_tcp_client.py` for your needs
-- Integrate the client class into your existing code
-- Add error handling and reconnection logic
-
-💡 **Tips:**
-- Use batch updates for better performance
-- Keep the connection open (don't reconnect for each update)
-- Handle disconnections gracefully
-- Add logging for debugging
-
-## Support
-
-Having issues? Check:
-1. [TCP Integration Guide](TCP_INTEGRATION.md) - Detailed troubleshooting
-2. [GitHub Issues](https://github.com/your-repo/issues) - Report bugs
-3. Network Log in RailwayStudio Monitor view - See what's being received
-
-Happy railway monitoring! 🚂✨
-
+- Read [TCP_INTEGRATION.md](TCP_INTEGRATION.md) for full protocol details
+- Read [MVC_ARCHITECTURE.md](MVC_ARCHITECTURE.md) to understand the codebase
+- Modify the example to fit your railway control logic

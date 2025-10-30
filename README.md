@@ -1,182 +1,137 @@
 # RailwayStudio
 
-A railway layout editor and real-time monitoring application built with Python and Qt.
+A railway layout editor and real-time monitoring application with Docker/microcontroller integration.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue.svg)
 ![PySide6](https://img.shields.io/badge/PySide6-6.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## 🚂 Overview
+## Overview
 
-RailwayStudio is a desktop application that allows you to:
-- **Design** complex railway layouts with an intuitive drag-and-drop editor
-- **Monitor** railway systems in real-time via TCP/UDP network updates
-- **Integrate** with Docker containers and microcontrollers for live status updates
-- **Validate** rail connections and automatically create logical track groups
-- **Save/Load** layouts in a structured JSON format
+RailwayStudio is a desktop application for:
+- **Designing** railway layouts with drag-and-drop editor
+- **Monitoring** railway systems in real-time via TCP
+- **Integrating** with Docker containers and microcontrollers
+- **Managing** track groups and connections automatically
 
-## ✨ Key Features
+## Key Features
 
-### 🎨 Visual Editor
-- Drag-and-drop rail placement (straight, curved, switch left/right)
-- Visual connection system with snap-to-grid alignment
-- Real-time validation of rail connections
-- Automatic grouping of connected track sections
-- Customizable rail lengths and rotations
+- 🎨 **Visual Editor** - Drag-and-drop rail placement (straight, curved, switches)
+- 📊 **Real-Time Monitor** - TCP server for receiving block status updates
+- 🐳 **Docker Integration** - JSON protocol for easy container integration
+- 🔄 **Auto-Grouping** - Automatic logical track grouping
+- 🌐 **Multi-Client** - Support for multiple simultaneous connections
+- 📝 **JSON Format** - Clean, readable layout files
 
-### 📊 Real-Time Monitor
-- Load and display railway layouts
-- **TCP Server** for receiving block status updates from Docker containers
-- **Automatic IP detection** - shows your IP address for Docker connections
-- Receive status updates: free, reserved, blocked, unknown
-- Automatic color coding based on block status
-- Multi-client support with connection tracking
-- Network status monitoring and logging
-- JSON-based protocol for easy integration
-
-### ⚙️ Advanced Features
-- **Auto-Grouping**: Automatically creates logical groups based on turnouts
-- **Connection Validation**: Ensures all rails are properly connected
-- **JSON Format**: Clean, readable layout format with metadata
-- **Network Configuration**: Customizable IP, port, and network settings
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd railwayStudio
-   ```
+```bash
+git clone <repository-url>
+cd railwayStudio
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-2. **Create virtual environment**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Running the Application
+### Run Application
 
 ```bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 python main.py
 ```
 
-## 📖 Usage
+## Usage
 
 ### Editor Mode
-1. Select rail type (Straight, Curved, Switch Left, Switch Right)
-2. Click on canvas to place rails
-3. Drag red connection dots together to connect rails
-4. Click "Auto-Create Groups" to validate and organize
-5. Save your layout with the "Save" button (saved to `layouts/` folder)
+1. Select rail type and click to place
+2. Drag connection dots to connect rails
+3. Click "Auto-Create Groups" to validate
+4. Save layout to `layouts/` folder
 
 ### Monitor Mode
-1. Load a layout with the "Load Layout" button
-2. Configure TCP port (default: 5555)
-3. Click "Start Server" to begin monitoring
-4. Connect from Docker containers or external systems
-5. Send block status updates via TCP
-6. Watch rail colors update in real-time
+1. Load a layout
+2. Set TCP port and bind address (default: 5555, 0.0.0.0)
+3. Click "Start Server"
+4. Note the IP address shown for Docker connections
+5. Send status updates from your containers
 
-**TCP Integration with Docker:**
+### Docker Integration
+
+**Quick Example:**
 ```python
 import socket, json
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect(('192.168.1.100', 5555))  # Use IP from Monitor view
 
-# Use the IP address shown in railwayStudio Monitor view
-sock.connect(('192.168.1.100', 5555))  # Replace with your actual IP
-
-# IMPORTANT: Use external Block IDs (BL00X00X) from your JSON layout file
-update = {"type": "status_update", "block_id": "BL001001", "status": "blocked"}
+update = {
+    "type": "status_update",
+    "block_id": "BL001001",  # Use Block IDs from your layout
+    "status": "blocked"      # free, reserved, blocked, unknown
+}
 sock.send((json.dumps(update) + '\n').encode('utf-8'))
 sock.close()
 ```
 
-**Key Points:**
-- ✅ Use **External Block IDs** (`BL001001`) not internal IDs (`rail_0001`)
-- ✅ Use your **actual IP address** (shown in Monitor view when server starts)
-- ✅ Server listens on `0.0.0.0` (all interfaces) - accessible from Docker
+**Extract Block IDs from your layout:**
+```bash
+python examples/extract_block_ids.py layouts/your_layout.json
+```
 
-**Guides:**
-- [TCP Quick Start](docs/TCP_QUICKSTART.md) - Get started in 5 minutes
-- [IP Address Guide](docs/IP_ADDRESS_GUIDE.md) - Finding your IP for Docker
-- [Block ID Mapping](docs/BLOCK_ID_MAPPING.md) - Understanding Block IDs
+**📖 Complete Guide:** See [TCP_QUICKSTART.md](docs/TCP_QUICKSTART.md) for step-by-step setup.
 
-### Files Management
-- All layouts are stored in the `layouts/` folder
-- Use the **Files** tab to browse, load, or delete layouts
-- The Files view automatically opens to the `layouts/` folder
+## Architecture
 
-## 🏗️ Project Structure
+RailwayStudio follows **MVC (Model-View-Controller)** pattern:
 
 ```
-railwaystudio/
-├── main.py                  # Application entry point
-├── requirements.txt         # Python dependencies
-├── README.md               # This file
-│
-├── layouts/                # 📂 Railway layout files
-│   ├── README.md           # Layout folder documentation
-│   └── *.json              # Saved layout files
-│
-├── examples/               # 📂 Example integration code
-│   ├── docker_tcp_client.py    # Docker TCP client example
-│   ├── extract_block_ids.py    # Extract Block IDs from JSON layout
-│   └── README.md           # Examples documentation
-│
-├── ui/                     # User Interface
-│   ├── main_window.py      # Main application window
-│   ├── editor_view.py      # Railway editor
-│   ├── monitor_view.py     # Real-time monitor with TCP server
-│   ├── settings_view.py    # Settings panel
-│   ├── home_view.py        # Welcome screen
-│   ├── files_view.py       # File management
-│   ├── rail_graphics.py    # Rail graphics rendering
-│   │
-│   └── styles/             # Centralized styling
-│       └── theme.py        # Colors, fonts, styles
-│
-├── controllers/            # Business Logic
+View (ui/)
+  ↕ signals
+Controller (controllers/)
+  ↕ updates
+Model (core/)
+```
+
+**Benefits:**
+- ✅ Testable - Each layer independent
+- ✅ Maintainable - Clear separation of concerns
+- ✅ Scalable - Easy to extend
+
+See [MVC_ARCHITECTURE.md](docs/MVC_ARCHITECTURE.md) for details.
+
+## Project Structure
+
+```
+railwayStudio/
+├── main.py                     # Entry point
+├── core/                       # MODEL - Data & business rules
+│   ├── railway_system.py       # Core data structures
+│   ├── tcp_server.py           # TCP server
+│   └── block_status.py         # Status definitions
+├── controllers/                # CONTROLLER - Business logic
 │   ├── editor_controller.py    # Editor operations
-│   └── monitor_controller.py   # Monitor operations
-│
-├── core/                   # Data Models
-│   ├── railway_system.py   # Core data structures
-│   ├── json_formatter.py   # JSON serialization
-│   └── tcp_server.py       # TCP server for network updates
-│
-└── docs/                   # Documentation
-    ├── TCP_QUICKSTART.md   # Quick start for Docker integration
-    ├── TCP_INTEGRATION.md  # Complete TCP protocol guide
-    ├── ARCHITECTURE.md     # Architecture details
-    └── ...                 # Additional docs
+│   ├── monitor_controller.py   # Monitor & TCP handling
+│   ├── files_controller.py     # File operations
+│   └── settings_controller.py  # Settings management
+├── ui/                         # VIEW - User interface
+│   ├── main_window.py          # Main window
+│   ├── editor_view.py          # Editor UI
+│   ├── monitor_view.py         # Monitor UI
+│   └── rail_graphics.py        # Graphics components
+├── layouts/                    # Layout files (.json)
+├── examples/                   # Integration examples
+│   ├── docker_tcp_client.py    # TCP client example
+│   └── extract_block_ids.py    # Extract IDs utility
+└── docs/                       # Documentation
+    ├── TCP_QUICKSTART.md       # 5-min setup guide
+    ├── TCP_INTEGRATION.md      # Protocol reference
+    └── MVC_ARCHITECTURE.md     # Architecture guide
 ```
 
-## 🎯 Key Concepts
+## TCP Protocol
 
-### Rail Blocks
-Individual track segments with:
-- Type (straight, curved, switch)
-- Position (x, y coordinates)
-- Rotation and length
-- Connections to other blocks
-
-### Rail Groups
-Logical sections of connected rails:
-- Defined by turnouts (switches)
-- Each group has start/end blocks
-- Used for train tracking and signaling
-
-### Network Updates (TCP Protocol)
-
-**Block Status Update** (recommended):
+### Status Update
 ```json
 {
   "type": "status_update",
@@ -185,13 +140,7 @@ Logical sections of connected rails:
 }
 ```
 
-**Status Values:**
-- `"free"` → Green (block available)
-- `"reserved"` → Orange (reserved for train)
-- `"blocked"` → Red (occupied by train)
-- `"unknown"` → Gray (status unknown)
-
-**Batch Update** (for multiple blocks):
+### Batch Update
 ```json
 {
   "type": "batch_update",
@@ -202,63 +151,54 @@ Logical sections of connected rails:
 }
 ```
 
-**Getting Block IDs for Docker:**
-```bash
-# Extract Block IDs from your layout file
-python3 examples/extract_block_ids.py layouts/your_layout.json
-```
+### Status Colors
+- `free` → Green
+- `reserved` → Orange  
+- `blocked` → Red
+- `unknown` → Gray
 
-## 🔧 Configuration
+**Full Protocol:** [TCP_INTEGRATION.md](docs/TCP_INTEGRATION.md)
+
+## Configuration
 
 ### Network Settings
-- **TCP Port**: 5555 (default, configurable)
-- **Protocol**: TCP server (listens on 0.0.0.0)
-- **Multi-Client**: Supports multiple simultaneous connections
-- **Auto-Reconnect**: Clients can reconnect automatically
+- **TCP Port**: 5555 (configurable in Settings)
+- **Bind Address**: 0.0.0.0 (all interfaces) or specific IP
+- **Protocol**: JSON over TCP, newline-delimited
+- **Multi-Client**: Unlimited connections
 
 ### Display Settings
-- **Grid**: Toggle dot grid for alignment
-- **Colors**: Customize block colors
-- **Zoom**: Mousewheel to zoom in/out
+- Grid toggle and snap-to-grid
+- Customizable colors
+- Zoom with mousewheel
 
-## 📚 Documentation
+## Documentation
 
-Detailed documentation is available in the `docs/` folder:
-
-**TCP Integration (New! 🔥)**
 - **[TCP Quick Start](docs/TCP_QUICKSTART.md)** - Get started with Docker in 5 minutes
-- **[TCP Integration Guide](docs/TCP_INTEGRATION.md)** - Complete protocol documentation
-- **[IP Address Guide](docs/IP_ADDRESS_GUIDE.md)** - Finding your IP for Docker connections
-- **[Block ID Mapping Guide](docs/BLOCK_ID_MAPPING.md)** - Understanding Block IDs (BL00X00X)
+- **[TCP Integration](docs/TCP_INTEGRATION.md)** - Complete protocol reference
+- **[MVC Architecture](docs/MVC_ARCHITECTURE.md)** - Codebase architecture
 
-**General Documentation**
-- **[Architecture Guide](docs/ARCHITECTURE.md)** - System architecture and design patterns
-- **[Refactoring Guide](docs/REFACTORING.md)** - Code structure and refactoring details
-- **[Connection Validation](docs/CONNECTION_VALIDATION.md)** - How validation works
-- **[Usage Guide](docs/USAGE.md)** - Detailed usage instructions
+## Troubleshooting
 
-## 🐛 Troubleshooting
+**Connection refused:**
+- Ensure TCP server is started (green status in Monitor)
+- Verify port and IP address
+- Check firewall settings
 
-### "Cannot save - Validation Failed"
-- Ensure all rails are properly connected
-- Check for isolated (disconnected) rails
-- Run "Auto-Create Groups" to identify issues
+**Block not found:**
+- Run "Auto-Create Groups" in Editor
+- Use Block IDs (BL001001) from JSON, not rail IDs (rail_0001)
+- Check Network Log for details
 
-### "Import PySide6 could not be resolved"
-- Make sure virtual environment is activated
-- Run: `pip install -r requirements.txt`
+**Import errors:**
+- Activate virtual environment
+- Run `pip install -r requirements.txt`
 
-### Layout not loading
-- Check JSON format is valid
-- Ensure all block IDs are unique
-- Verify connections in metadata
+## License
 
-## 📝 License
+MIT License
 
-This project is licensed under the MIT License.
+## Built With
 
-## 🙏 Acknowledgments
-
-Built with:
 - [PySide6](https://doc.qt.io/qtforpython-6/) - Qt for Python
-- [Python 3.13](https://www.python.org/) - Programming language
+- [Python 3.13](https://www.python.org/)
