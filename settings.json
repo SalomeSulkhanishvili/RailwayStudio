@@ -1,0 +1,14 @@
+{
+  "grid_size": 20,
+  "rail_color": "#888888",
+  "selected_color": "#4A90E2",
+  "connection_color": "#FF5252",
+  "udp_port": 5000,
+  "ip_address": "192.168.1.100",
+  "subnet_mask": "255.255.255.0",
+  "gateway": "192.168.1.1",
+  "dns_server": "8.8.8.8",
+  "auto_save": false,
+  "show_grid": true,
+  "snap_to_grid": true
+}

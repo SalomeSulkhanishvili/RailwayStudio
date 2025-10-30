@@ -1,0 +1,360 @@
+{
+  "blockGroups": {
+    "BG001": {
+      "id": "BG001",
+      "description": "Section 5",
+      "blocks": [
+        {
+          "id": "BL001001",
+          "description": "Block BL001001 (straight)",
+          "axleCounter": "AC001001",
+          "signals": [
+            {
+              "id": "SG001001_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001001_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            -3,
+            -1
+          ],
+          "_original": {
+            "rail_id": "rail_0001",
+            "type": "straight",
+            "x": -391.0,
+            "y": -180.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL001002",
+          "description": "Block BL001002 (straight)",
+          "axleCounter": "AC001002",
+          "signals": [
+            {
+              "id": "SG001002_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001002_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            -1,
+            -1
+          ],
+          "_original": {
+            "rail_id": "rail_0002",
+            "type": "straight",
+            "x": -119.0,
+            "y": -173.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL001003",
+          "description": "Block BL001003 (straight)",
+          "axleCounter": "AC001003",
+          "signals": [
+            {
+              "id": "SG001003_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001003_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            1,
+            -1
+          ],
+          "_original": {
+            "rail_id": "rail_0005",
+            "type": "straight",
+            "x": 122.0,
+            "y": -174.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL001004",
+          "description": "Block BL001004 (straight)",
+          "axleCounter": "AC001004",
+          "signals": [
+            {
+              "id": "SG001004_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001004_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            2,
+            0
+          ],
+          "_original": {
+            "rail_id": "rail_0006",
+            "type": "straight",
+            "x": 207.0,
+            "y": -2.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL001005",
+          "description": "Block BL001005 (straight)",
+          "axleCounter": "AC001005",
+          "signals": [
+            {
+              "id": "SG001005_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001005_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            0,
+            0
+          ],
+          "_original": {
+            "rail_id": "rail_0004",
+            "type": "straight",
+            "x": -67.0,
+            "y": 0.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL001006",
+          "description": "Block BL001006 (straight)",
+          "axleCounter": "AC001006",
+          "signals": [
+            {
+              "id": "SG001006_F",
+              "direction": 0
+            },
+            {
+              "id": "SG001006_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            -3,
+            0
+          ],
+          "_original": {
+            "rail_id": "rail_0003",
+            "type": "straight",
+            "x": -319.0,
+            "y": -12.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        }
+      ],
+      "direction": "Forward",
+      "start_block_id": "BL001001",
+      "end_block_id": "BL001006",
+      "last_block_axleCounter": "AC001007"
+    }
+  },
+  "turnouts": {
+    "groups": []
+  },
+  "metadata": {
+    "next_block_id": "BL002001",
+    "next_group_id": "BG002",
+    "app_mode": "SetConnections",
+    "last_updated": "2025-10-23T22:05:29.188854",
+    "version": "1.0.0",
+    "_legacy_data": {
+      "version": "1.0",
+      "next_id": 7,
+      "next_group_id": 6,
+      "blocks": {
+        "rail_0001": {
+          "id": "rail_0001",
+          "type": "straight",
+          "x": -391.0,
+          "y": -180.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": null,
+            "end": [
+              "rail_0002",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0002"
+          ],
+          "prev_rails": [],
+          "group_id": "group_0005"
+        },
+        "rail_0002": {
+          "id": "rail_0002",
+          "type": "straight",
+          "x": -119.0,
+          "y": -173.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0001",
+              "end"
+            ],
+            "end": [
+              "rail_0005",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0005"
+          ],
+          "prev_rails": [
+            "rail_0001"
+          ],
+          "group_id": "group_0005"
+        },
+        "rail_0003": {
+          "id": "rail_0003",
+          "type": "straight",
+          "x": -319.0,
+          "y": -12.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": null,
+            "end": [
+              "rail_0004",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0004"
+          ],
+          "prev_rails": [],
+          "group_id": "group_0005"
+        },
+        "rail_0004": {
+          "id": "rail_0004",
+          "type": "straight",
+          "x": -67.0,
+          "y": 0.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0003",
+              "end"
+            ],
+            "end": [
+              "rail_0006",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0006"
+          ],
+          "prev_rails": [
+            "rail_0003"
+          ],
+          "group_id": "group_0005"
+        },
+        "rail_0005": {
+          "id": "rail_0005",
+          "type": "straight",
+          "x": 122.0,
+          "y": -174.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0002",
+              "end"
+            ],
+            "end": [
+              "rail_0006",
+              "end"
+            ]
+          },
+          "next_rails": [
+            "rail_0006"
+          ],
+          "prev_rails": [
+            "rail_0002"
+          ],
+          "group_id": "group_0005"
+        },
+        "rail_0006": {
+          "id": "rail_0006",
+          "type": "straight",
+          "x": 207.0,
+          "y": -2.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0004",
+              "end"
+            ],
+            "end": [
+              "rail_0005",
+              "end"
+            ]
+          },
+          "next_rails": [
+            "rail_0005"
+          ],
+          "prev_rails": [
+            "rail_0004"
+          ],
+          "group_id": "group_0005"
+        }
+      },
+      "groups": {
+        "group_0005": {
+          "id": "group_0005",
+          "name": "Section 5",
+          "rail_ids": [
+            "rail_0001",
+            "rail_0002",
+            "rail_0005",
+            "rail_0006",
+            "rail_0004",
+            "rail_0003"
+          ],
+          "color": "#888888"
+        }
+      }
+    }
+  }
+}

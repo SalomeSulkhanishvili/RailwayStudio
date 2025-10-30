@@ -1,0 +1,260 @@
+{
+  "blockGroups": {
+    "BG002": {
+      "id": "BG002",
+      "description": "Section 3",
+      "blocks": [
+        {
+          "id": "BL002001",
+          "description": "Block BL002001 (straight)",
+          "axleCounter": "AC002001",
+          "signals": [
+            {
+              "id": "SG002001_F",
+              "direction": 0
+            },
+            {
+              "id": "SG002001_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            -3,
+            -1
+          ],
+          "_original": {
+            "rail_id": "rail_0001",
+            "type": "straight",
+            "x": -306.0,
+            "y": -164.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL002002",
+          "description": "Block BL002002 (straight)",
+          "axleCounter": "AC002002",
+          "signals": [
+            {
+              "id": "SG002002_F",
+              "direction": 0
+            },
+            {
+              "id": "SG002002_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            -2,
+            0
+          ],
+          "_original": {
+            "rail_id": "rail_0003",
+            "type": "straight",
+            "x": -236.0,
+            "y": -44.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL002003",
+          "description": "Block BL002003 (straight)",
+          "axleCounter": "AC002003",
+          "signals": [
+            {
+              "id": "SG002003_F",
+              "direction": 0
+            },
+            {
+              "id": "SG002003_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            0,
+            0
+          ],
+          "_original": {
+            "rail_id": "rail_0004",
+            "type": "straight",
+            "x": 31.0,
+            "y": -35.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        },
+        {
+          "id": "BL002004",
+          "description": "Block BL002004 (straight)",
+          "axleCounter": "AC002004",
+          "signals": [
+            {
+              "id": "SG002004_F",
+              "direction": 0
+            },
+            {
+              "id": "SG002004_B",
+              "direction": 1
+            }
+          ],
+          "grid_pos": [
+            0,
+            -1
+          ],
+          "_original": {
+            "rail_id": "rail_0002",
+            "type": "straight",
+            "x": -3.0,
+            "y": -157.0,
+            "rotation": 0,
+            "length": 100,
+            "color": "#888888"
+          }
+        }
+      ],
+      "direction": "Forward",
+      "start_block_id": "BL002001",
+      "end_block_id": "BL002004",
+      "last_block_axleCounter": "AC002005"
+    }
+  },
+  "turnouts": {
+    "groups": []
+  },
+  "metadata": {
+    "next_block_id": "BL003001",
+    "next_group_id": "BG003",
+    "app_mode": "SetConnections",
+    "last_updated": "2025-10-24T00:09:50.143462",
+    "version": "1.0.0",
+    "_legacy_data": {
+      "version": "1.0",
+      "next_id": 5,
+      "next_group_id": 4,
+      "blocks": {
+        "rail_0001": {
+          "id": "rail_0001",
+          "type": "straight",
+          "x": -306.0,
+          "y": -164.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0003",
+              "start"
+            ],
+            "end": [
+              "rail_0002",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0002"
+          ],
+          "prev_rails": [
+            "rail_0003"
+          ],
+          "group_id": "group_0003"
+        },
+        "rail_0002": {
+          "id": "rail_0002",
+          "type": "straight",
+          "x": -3.0,
+          "y": -157.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0001",
+              "end"
+            ],
+            "end": [
+              "rail_0004",
+              "end"
+            ]
+          },
+          "next_rails": [
+            "rail_0004"
+          ],
+          "prev_rails": [
+            "rail_0001"
+          ],
+          "group_id": "group_0003"
+        },
+        "rail_0003": {
+          "id": "rail_0003",
+          "type": "straight",
+          "x": -236.0,
+          "y": -44.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0001",
+              "start"
+            ],
+            "end": [
+              "rail_0004",
+              "start"
+            ]
+          },
+          "next_rails": [
+            "rail_0004"
+          ],
+          "prev_rails": [
+            "rail_0001"
+          ],
+          "group_id": "group_0003"
+        },
+        "rail_0004": {
+          "id": "rail_0004",
+          "type": "straight",
+          "x": 31.0,
+          "y": -35.0,
+          "rotation": 0,
+          "length": 100,
+          "color": "#888888",
+          "connections": {
+            "start": [
+              "rail_0003",
+              "end"
+            ],
+            "end": [
+              "rail_0002",
+              "end"
+            ]
+          },
+          "next_rails": [
+            "rail_0002"
+          ],
+          "prev_rails": [
+            "rail_0003"
+          ],
+          "group_id": "group_0003"
+        }
+      },
+      "groups": {
+        "group_0003": {
+          "id": "group_0003",
+          "name": "Section 3",
+          "rail_ids": [
+            "rail_0001",
+            "rail_0003",
+            "rail_0004",
+            "rail_0002"
+          ],
+          "color": "#888888"
+        }
+      }
+    }
+  }
+}
