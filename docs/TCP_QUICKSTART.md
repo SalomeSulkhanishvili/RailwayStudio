@@ -28,6 +28,9 @@ python3 main.py
 2. Set the TCP port (default: 5555)
 3. Click **"▶ Start Server"**
 4. Status should show: "● Server running on port 5555"
+5. **Important**: Note the IP address(es) shown in the "Connect from Docker using:" section
+   - Example: `192.168.1.100:5555`
+   - This is what you'll use in your Docker container
 
 ## Test the Connection
 
@@ -64,11 +67,15 @@ import json
 # Connect to RailwayStudio on host
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-# Choose the right host for your OS:
-# - Mac/Windows Docker: 'host.docker.internal'
-# - Linux Docker: '172.17.0.1'
-# - Host network mode: 'localhost'
-sock.connect(('host.docker.internal', 5555))
+# OPTION 1 (Recommended): Use host machine's actual IP address
+# Check railwayStudio Monitor view for the IP address
+sock.connect(('192.168.1.100', 5555))  # Replace with your IP from Monitor view
+
+# OPTION 2: Use Docker special hostname (Mac/Windows)
+# sock.connect(('host.docker.internal', 5555))
+
+# OPTION 3: Use Docker bridge gateway (Linux)
+# sock.connect(('172.17.0.1', 5555))
 
 # Send block status update
 # IMPORTANT: Use external Block IDs (BL00X00X format)
@@ -147,20 +154,40 @@ Send one of these status values:
 
 ## Docker Network Configuration
 
-### Recommended: Host Network Mode
+### Option 1: Use Host Machine's IP Address (Recommended)
 
-Simplest approach - container shares host network:
+**Best for when Docker and railwayStudio are on the same PC:**
+
+1. Start railwayStudio TCP server
+2. Check the Monitor view - it will show your IP address (e.g., `192.168.1.100:5555`)
+3. Use that IP in your Docker container:
+
+```python
+# Use the IP shown in railwayStudio Monitor view
+sock.connect(('192.168.1.100', 5555))  # Replace with your actual IP
+```
+
+**How to find your IP manually:**
+```bash
+# macOS/Linux
+ifconfig | grep "inet " | grep -v 127.0.0.1
+
+# Windows
+ipconfig | findstr IPv4
+```
+
+### Option 2: Host Network Mode
+
+Container shares host network (won't work on Mac/Windows Docker Desktop):
 
 ```bash
 docker run --network host your-image
 # Connect to localhost:5555 from inside container
 ```
 
-### Alternative: Bridge Network (Default)
+### Option 3: Docker Special Hostnames
 
-Container on separate network:
-
-**Mac/Windows:**
+**Mac/Windows Docker Desktop:**
 ```python
 sock.connect(('host.docker.internal', 5555))
 ```
@@ -200,21 +227,36 @@ sock.connect(('172.17.0.1', 5555))  # Docker bridge gateway
 
 ### Docker can't connect to host
 
-✅ **Try:**
+✅ **Try in this order:**
 
-**Mac/Windows:**
+**1. Use the actual IP address shown in railwayStudio Monitor view:**
+```python
+sock.connect(('192.168.1.100', 5555))  # Replace with your IP
+```
+
+**2. Mac/Windows - Try Docker special hostname:**
 ```python
 sock.connect(('host.docker.internal', 5555))
 ```
 
-**Linux:**
+**3. Linux - Try Docker bridge gateway:**
 ```python
 sock.connect(('172.17.0.1', 5555))
 ```
 
-**Or use host network:**
+**4. Find your IP manually:**
+```bash
+# macOS/Linux
+ifconfig | grep "inet " | grep -v 127.0.0.1
+
+# Windows  
+ipconfig | findstr IPv4
+```
+
+**5. Or use host network (Linux only):**
 ```bash
 docker run --network host your-image
+sock.connect(('localhost', 5555))
 ```
 
 ## Real-World Integration
@@ -227,7 +269,7 @@ import json
 import time
 
 class RailwayStudioClient:
-    def __init__(self, host='host.docker.internal', port=5555):
+    def __init__(self, host='192.168.1.100', port=5555):  # Use your actual IP
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         

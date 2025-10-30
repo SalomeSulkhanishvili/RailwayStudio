@@ -27,6 +27,7 @@ RailwayStudio is a desktop application that allows you to:
 ### 📊 Real-Time Monitor
 - Load and display railway layouts
 - **TCP Server** for receiving block status updates from Docker containers
+- **Automatic IP detection** - shows your IP address for Docker connections
 - Receive status updates: free, reserved, blocked, unknown
 - Automatic color coding based on block status
 - Multi-client support with connection tracking
@@ -88,7 +89,9 @@ python main.py
 ```python
 import socket, json
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('host.docker.internal', 5555))  # Mac/Windows Docker
+
+# Use the IP address shown in railwayStudio Monitor view
+sock.connect(('192.168.1.100', 5555))  # Replace with your actual IP
 
 # IMPORTANT: Use external Block IDs (BL00X00X) from your JSON layout file
 update = {"type": "status_update", "block_id": "BL001001", "status": "blocked"}
@@ -96,10 +99,15 @@ sock.send((json.dumps(update) + '\n').encode('utf-8'))
 sock.close()
 ```
 
-**Note**: Use External Block IDs (`BL001001`) not internal IDs (`rail_0001`). 
-See [Block ID Mapping Guide](docs/BLOCK_ID_MAPPING.md) for details.
+**Key Points:**
+- ✅ Use **External Block IDs** (`BL001001`) not internal IDs (`rail_0001`)
+- ✅ Use your **actual IP address** (shown in Monitor view when server starts)
+- ✅ Server listens on `0.0.0.0` (all interfaces) - accessible from Docker
 
-See [TCP Quick Start Guide](docs/TCP_QUICKSTART.md) for full Docker integration guide.
+**Guides:**
+- [TCP Quick Start](docs/TCP_QUICKSTART.md) - Get started in 5 minutes
+- [IP Address Guide](docs/IP_ADDRESS_GUIDE.md) - Finding your IP for Docker
+- [Block ID Mapping](docs/BLOCK_ID_MAPPING.md) - Understanding Block IDs
 
 ### Files Management
 - All layouts are stored in the `layouts/` folder
@@ -220,6 +228,7 @@ Detailed documentation is available in the `docs/` folder:
 **TCP Integration (New! 🔥)**
 - **[TCP Quick Start](docs/TCP_QUICKSTART.md)** - Get started with Docker in 5 minutes
 - **[TCP Integration Guide](docs/TCP_INTEGRATION.md)** - Complete protocol documentation
+- **[IP Address Guide](docs/IP_ADDRESS_GUIDE.md)** - Finding your IP for Docker connections
 - **[Block ID Mapping Guide](docs/BLOCK_ID_MAPPING.md)** - Understanding Block IDs (BL00X00X)
 
 **General Documentation**

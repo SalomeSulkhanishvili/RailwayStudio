@@ -14,6 +14,7 @@ from core.railway_system import RailwaySystem
 from core.tcp_server import RailwayTCPServer, BlockStatus
 from ui.rail_graphics import RailGraphicsItem
 import json
+import socket
 
 
 class DotGridScene(QGraphicsScene):
@@ -174,6 +175,27 @@ class MonitorView(QWidget):
         """)
         port_layout.addWidget(self.port_spin)
         network_content.addLayout(port_layout)
+        
+        # Server address info
+        self.server_address_label = QLabel("Server will listen on: 0.0.0.0 (all interfaces)")
+        self.server_address_label.setStyleSheet("color: #4A5568; font-size: 10px; padding: 5px;")
+        self.server_address_label.setWordWrap(True)
+        network_content.addWidget(self.server_address_label)
+        
+        # Host IP addresses (for Docker connection)
+        self.host_ip_label = QLabel("")
+        self.host_ip_label.setStyleSheet("""
+            color: #2D3748; 
+            font-size: 11px; 
+            background-color: #EDF2F7;
+            border-radius: 6px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        """)
+        self.host_ip_label.setWordWrap(True)
+        self.host_ip_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        network_content.addWidget(self.host_ip_label)
+        self.update_host_ip_display()
         
         # Connected clients label
         self.clients_label = QLabel("Connected clients: 0")
@@ -384,6 +406,50 @@ class MonitorView(QWidget):
         # Connect settings controller signals
         if self.settings_controller:
             self.settings_controller.network_settings_changed.connect(self.apply_network_settings)
+    
+    def update_host_ip_display(self):
+        """Update the display of host IP addresses for Docker connection"""
+        try:
+            # Get hostname
+            hostname = socket.gethostname()
+            
+            # Get all IP addresses
+            ip_addresses = []
+            
+            # Try to get the main IP address (connected to internet)
+            try:
+                # Create a socket to determine the main IP
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                main_ip = s.getsockname()[0]
+                s.close()
+                ip_addresses.append(("Primary", main_ip))
+            except:
+                pass
+            
+            # Get all network interface IPs
+            try:
+                all_ips = socket.getaddrinfo(hostname, None)
+                for ip_info in all_ips:
+                    ip = ip_info[4][0]
+                    # Filter out IPv6, localhost, and duplicates
+                    if ':' not in ip and ip != '127.0.0.1' and ip not in [addr[1] for addr in ip_addresses]:
+                        ip_addresses.append(("Network", ip))
+            except:
+                pass
+            
+            # Display the IP addresses
+            if ip_addresses:
+                ip_text = "🔗 <b>Connect from Docker using:</b><br>"
+                for label, ip in ip_addresses:
+                    ip_text += f"• {ip}:{self.port_spin.value()}<br>"
+                ip_text += "<br><small>Copy and use in your Docker container</small>"
+                self.host_ip_label.setText(ip_text)
+            else:
+                self.host_ip_label.setText("⚠️ Could not detect IP addresses")
+                
+        except Exception as e:
+            self.host_ip_label.setText(f"⚠️ Error detecting IP: {str(e)}")
         
     def start_network_listener(self):
         """Start the TCP server"""
@@ -430,7 +496,12 @@ class MonitorView(QWidget):
                 font-weight: 600;
             """)
             self.port_spin.setEnabled(False)
+            
+            # Update IP display
+            self.update_host_ip_display()
+            
             self.log(f"🟢 TCP Server started on 0.0.0.0:{port}")
+            self.log(f"📡 Accepting connections from any IP address")
         else:
             self.tcp_server = None
             self.log(f"❌ Failed to start TCP server on port {port}")
