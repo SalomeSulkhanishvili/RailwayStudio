@@ -11,6 +11,7 @@ from PySide6.QtGui import QPainter, QColor, QBrush, QFont
 from PySide6.QtNetwork import QUdpSocket, QTcpServer, QTcpSocket, QHostAddress
 
 from core.railway_system import RailwaySystem
+from core.tcp_server import RailwayTCPServer, BlockStatus
 from ui.rail_graphics import RailGraphicsItem
 import json
 
@@ -48,57 +49,7 @@ class DotGridScene(QGraphicsScene):
             x += self.grid_spacing
 
 
-class NetworkListener(QThread):
-    """Thread for listening to network updates"""
-    
-    packet_received = Signal(str)
-    
-    def __init__(self, port: int, protocol: str = 'UDP'):
-        super().__init__()
-        self.port = port
-        self.protocol = protocol
-        self.running = False
-        self.socket = None
-        
-    def run(self):
-        """Run the network listener"""
-        self.running = True
-        
-        if self.protocol == 'UDP':
-            self.run_udp()
-        else:
-            self.run_tcp()
-            
-    def run_udp(self):
-        """Run UDP listener"""
-        self.socket = QUdpSocket()
-        
-        if not self.socket.bind(QHostAddress.Any, self.port):
-            print(f"Failed to bind UDP socket on port {self.port}")
-            return
-            
-        print(f"UDP listener started on port {self.port}")
-        
-        while self.running:
-            if self.socket.hasPendingDatagrams():
-                datagram, host, port = self.socket.readDatagram(
-                    self.socket.pendingDatagramSize()
-                )
-                data = datagram.data().decode('utf-8', errors='ignore')
-                self.packet_received.emit(data)
-                
-            QThread.msleep(10)
-            
-    def run_tcp(self):
-        """Run TCP listener"""
-        print(f"TCP listener not fully implemented yet, using UDP")
-        self.run_udp()
-        
-    def stop(self):
-        """Stop the listener"""
-        self.running = False
-        if self.socket:
-            self.socket.close()
+# NetworkListener class removed - now using RailwayTCPServer directly
 
 
 class MonitorView(QWidget):
@@ -108,7 +59,7 @@ class MonitorView(QWidget):
         super().__init__()
         self.railway_system = railway_system
         self.settings_controller = settings_controller
-        self.network_listener = None
+        self.tcp_server: RailwayTCPServer = None
         self.listening = False
         
         self.setup_ui()
@@ -199,18 +150,19 @@ class MonitorView(QWidget):
         right_layout.addWidget(load_btn)
         
         # Network settings
-        network_card = self.create_card("🌐 Network Settings")
+        network_card = self.create_card("🌐 TCP Server Settings")
         network_content = QVBoxLayout()
         network_content.setSpacing(10)
         
+        # TCP Port
         port_layout = QHBoxLayout()
-        port_label = QLabel("UDP Port:")
+        port_label = QLabel("TCP Port:")
         port_label.setStyleSheet("color: #2D3748; font-weight: 600;")
         port_layout.addWidget(port_label)
         
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1024, 65535)
-        self.port_spin.setValue(5000)
+        self.port_spin.setValue(5555)
         self.port_spin.setStyleSheet("""
             QSpinBox {
                 background-color: #F7FAFC;
@@ -222,6 +174,11 @@ class MonitorView(QWidget):
         """)
         port_layout.addWidget(self.port_spin)
         network_content.addLayout(port_layout)
+        
+        # Connected clients label
+        self.clients_label = QLabel("Connected clients: 0")
+        self.clients_label.setStyleSheet("color: #4A5568; font-size: 11px;")
+        network_content.addWidget(self.clients_label)
         
         self.start_btn = QPushButton("▶ Start Listening")
         self.start_btn.clicked.connect(self.toggle_listening)
@@ -429,56 +386,66 @@ class MonitorView(QWidget):
             self.settings_controller.network_settings_changed.connect(self.apply_network_settings)
         
     def start_network_listener(self):
-        """Start listening for network packets"""
+        """Start the TCP server"""
         if self.listening:
             return
             
         port = self.port_spin.value()
         
-        self.network_listener = NetworkListener(port, 'UDP')
-        self.network_listener.packet_received.connect(self.on_packet_received)
-        self.network_listener.start()
+        # Create and configure TCP server
+        self.tcp_server = RailwayTCPServer(port=port, host="0.0.0.0")
         
-        self.listening = True
-        self.start_btn.setText("⏸ Stop Listening")
-        self.start_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #E53E3E;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px;
+        # Connect signals
+        self.tcp_server.log_message.connect(self.log)
+        self.tcp_server.error_occurred.connect(lambda msg: self.log(f"❌ {msg}"))
+        self.tcp_server.client_connected.connect(self.on_client_connected)
+        self.tcp_server.client_disconnected.connect(self.on_client_disconnected)
+        self.tcp_server.block_status_update.connect(self.on_block_status_update)
+        self.tcp_server.batch_status_update.connect(self.on_batch_status_update)
+        
+        # Start server
+        if self.tcp_server.start():
+            self.listening = True
+            self.start_btn.setText("⏸ Stop Server")
+            self.start_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E53E3E;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background-color: #C53030;
+                }
+            """)
+            self.status_label.setText(f"● Server running on port {port}")
+            self.status_label.setStyleSheet("""
+                padding: 8px;
+                background-color: #F0FFF4;
+                color: #22543D;
+                border-radius: 6px;
                 font-weight: 600;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #C53030;
-            }
-        """)
-        self.status_label.setText(f"● Listening on port {port}")
-        self.status_label.setStyleSheet("""
-            padding: 8px;
-            background-color: #F0FFF4;
-            color: #22543D;
-            border-radius: 6px;
-            font-weight: 600;
-        """)
-        self.port_spin.setEnabled(False)
-        
-        self.log(f"🟢 Started listening on UDP port {port}")
+            """)
+            self.port_spin.setEnabled(False)
+            self.log(f"🟢 TCP Server started on 0.0.0.0:{port}")
+        else:
+            self.tcp_server = None
+            self.log(f"❌ Failed to start TCP server on port {port}")
         
     def stop_network_listener(self):
-        """Stop listening for network packets"""
+        """Stop the TCP server"""
         if not self.listening:
             return
             
-        if self.network_listener:
-            self.network_listener.stop()
-            self.network_listener.wait()
-            self.network_listener = None
+        if self.tcp_server:
+            self.tcp_server.stop()
+            self.tcp_server = None
             
         self.listening = False
-        self.start_btn.setText("▶ Start Listening")
+        self.start_btn.setText("▶ Start Server")
         self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #48BB78;
@@ -493,7 +460,7 @@ class MonitorView(QWidget):
                 background-color: #38A169;
             }
         """)
-        self.status_label.setText("● Not listening")
+        self.status_label.setText("● Server stopped")
         self.status_label.setStyleSheet("""
             padding: 8px;
             background-color: #FFF5F5;
@@ -502,67 +469,69 @@ class MonitorView(QWidget):
             font-weight: 600;
         """)
         self.port_spin.setEnabled(True)
+        self.clients_label.setText("Connected clients: 0")
         
-        self.log("🔴 Stopped listening")
+        self.log("🔴 TCP Server stopped")
         
     def toggle_listening(self):
-        """Toggle network listening"""
+        """Toggle TCP server"""
         if self.listening:
             self.stop_network_listener()
         else:
             self.start_network_listener()
-            
-    def on_packet_received(self, data: str):
-        """Handle received network packet"""
-        self.log(f"📦 {data}")
+    
+    def on_client_connected(self, client_id: str):
+        """Handle new client connection"""
+        if self.tcp_server:
+            client_count = len(self.tcp_server.get_connected_clients())
+            self.clients_label.setText(f"Connected clients: {client_count}")
+    
+    def on_client_disconnected(self, client_id: str):
+        """Handle client disconnection"""
+        if self.tcp_server:
+            client_count = len(self.tcp_server.get_connected_clients())
+            self.clients_label.setText(f"Connected clients: {client_count}")
+    
+    def on_block_status_update(self, block_id: str, status: str):
+        """Handle single block status update from TCP server"""
+        # Get color for status
+        color = BlockStatus.get_color(status)
         
-        try:
-            # Try JSON format first
-            packet = json.loads(data)
-            block_id = packet.get('block_id')
-            color = packet.get('color')
-            
-            if block_id and color:
-                self.apply_color_update(block_id, color)
-            else:
-                self.log("⚠️ Invalid packet: missing block_id or color")
-                
-        except json.JSONDecodeError:
-            # Try simple format: "rail_0001:red"
-            if ':' in data:
-                parts = data.strip().split(':', 1)
-                if len(parts) == 2:
-                    block_id, color = parts
-                    self.apply_color_update(block_id.strip(), color.strip())
-                else:
-                    self.log(f"⚠️ Invalid simple format")
-            else:
-                self.log(f"⚠️ Invalid packet format")
-                
-    def apply_color_update(self, block_id: str, color: str):
-        """Apply color update to a block"""
-        # Convert color name to hex if needed
-        color_map = {
-            'red': '#FF0000',
-            'green': '#00FF00',
-            'blue': '#0000FF',
-            'yellow': '#FFFF00',
-            'orange': '#FFA500',
-            'purple': '#800080',
-            'gray': '#888888',
-            'black': '#000000',
-            'white': '#FFFFFF'
-        }
-        
-        if color.lower() in color_map:
-            color = color_map[color.lower()]
-            
-        # Update block color
+        # Update block color in railway system
         if block_id in self.railway_system.blocks:
             self.railway_system.set_block_color(block_id, color)
-            self.log(f"✓ Updated {block_id} → {color}")
+            self.log(f"✓ {block_id} → {status} ({color})")
         else:
-            self.log(f"❌ Block not found: {block_id}")
+            # Try to find by block_id (BL001001) instead of rail_id
+            found = False
+            for rail_id, block in self.railway_system.blocks.items():
+                if hasattr(block, 'block_id') and block.block_id == block_id:
+                    self.railway_system.set_block_color(rail_id, color)
+                    self.log(f"✓ {block_id} (rail {rail_id}) → {status} ({color})")
+                    found = True
+                    break
+            
+            if not found:
+                self.log(f"⚠️ Block not found: {block_id}")
+    
+    def on_batch_status_update(self, updates: list):
+        """Handle batch status updates from TCP server"""
+        success_count = 0
+        for block_id, status in updates:
+            color = BlockStatus.get_color(status)
+            
+            if block_id in self.railway_system.blocks:
+                self.railway_system.set_block_color(block_id, color)
+                success_count += 1
+            else:
+                # Try to find by block_id (BL001001)
+                for rail_id, block in self.railway_system.blocks.items():
+                    if hasattr(block, 'block_id') and block.block_id == block_id:
+                        self.railway_system.set_block_color(rail_id, color)
+                        success_count += 1
+                        break
+        
+        self.log(f"✓ Batch update: {success_count}/{len(updates)} blocks updated")
             
     def on_block_color_changed(self, block_id: str, color: str):
         """Handle block color change"""
@@ -646,14 +615,15 @@ class MonitorView(QWidget):
         
     def apply_network_settings(self, settings: dict):
         """Apply network settings from settings controller"""
-        # Update UDP port
-        if 'udp_port' in settings:
-            self.port_spin.setValue(settings['udp_port'])
-            self.log(f"📡 Network settings updated: Port {settings['udp_port']}")
+        # Update TCP port (check both tcp_port and udp_port for backward compatibility)
+        port = settings.get('tcp_port') or settings.get('udp_port')
+        if port:
+            self.port_spin.setValue(port)
+            self.log(f"📡 Network settings updated: Port {port}")
         
         # If currently listening, restart with new settings
         if self.listening:
-            self.log("🔄 Restarting network listener with new settings...")
+            self.log("🔄 Restarting TCP server with new settings...")
             self.stop_network_listener()
             self.start_network_listener()
     

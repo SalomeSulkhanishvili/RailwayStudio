@@ -10,7 +10,8 @@ A professional railway layout editor and real-time monitoring application built 
 
 RailwayStudio is a desktop application that allows you to:
 - **Design** complex railway layouts with an intuitive drag-and-drop editor
-- **Monitor** railway systems in real-time via UDP network updates
+- **Monitor** railway systems in real-time via TCP/UDP network updates
+- **Integrate** with Docker containers and microcontrollers for live status updates
 - **Validate** rail connections and automatically create logical track groups
 - **Save/Load** layouts in a structured JSON format
 
@@ -25,9 +26,12 @@ RailwayStudio is a desktop application that allows you to:
 
 ### 📊 Real-Time Monitor
 - Load and display railway layouts
-- Receive UDP packets for block color updates
-- Simulate train positions with color changes
+- **TCP Server** for receiving block status updates from Docker containers
+- Receive status updates: free, reserved, blocked, unknown
+- Automatic color coding based on block status
+- Multi-client support with connection tracking
 - Network status monitoring and logging
+- JSON-based protocol for easy integration
 
 ### ⚙️ Advanced Features
 - **Auto-Grouping**: Automatically creates logical groups based on turnouts
@@ -74,10 +78,28 @@ python main.py
 
 ### Monitor Mode
 1. Load a layout with the "Load Layout" button
-2. Configure UDP port in Network Settings
-3. Click "Start Listening" to begin monitoring
-4. Send UDP packets in format: `BLOCK_ID:COLOR`
-5. Watch rail colors update in real-time
+2. Configure TCP port (default: 5555)
+3. Click "Start Server" to begin monitoring
+4. Connect from Docker containers or external systems
+5. Send block status updates via TCP
+6. Watch rail colors update in real-time
+
+**TCP Integration with Docker:**
+```python
+import socket, json
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect(('host.docker.internal', 5555))  # Mac/Windows Docker
+
+# IMPORTANT: Use external Block IDs (BL00X00X) from your JSON layout file
+update = {"type": "status_update", "block_id": "BL001001", "status": "blocked"}
+sock.send((json.dumps(update) + '\n').encode('utf-8'))
+sock.close()
+```
+
+**Note**: Use External Block IDs (`BL001001`) not internal IDs (`rail_0001`). 
+See [Block ID Mapping Guide](docs/BLOCK_ID_MAPPING.md) for details.
+
+See [TCP Quick Start Guide](docs/TCP_QUICKSTART.md) for full Docker integration guide.
 
 ### Files Management
 - All layouts are stored in the `layouts/` folder
@@ -96,10 +118,15 @@ railwaystudio/
 │   ├── README.md           # Layout folder documentation
 │   └── *.json              # Saved layout files
 │
+├── examples/               # 📂 Example integration code
+│   ├── docker_tcp_client.py    # Docker TCP client example
+│   ├── extract_block_ids.py    # Extract Block IDs from JSON layout
+│   └── README.md           # Examples documentation
+│
 ├── ui/                     # User Interface
 │   ├── main_window.py      # Main application window
 │   ├── editor_view.py      # Railway editor
-│   ├── monitor_view.py     # Real-time monitor
+│   ├── monitor_view.py     # Real-time monitor with TCP server
 │   ├── settings_view.py    # Settings panel
 │   ├── home_view.py        # Welcome screen
 │   ├── files_view.py       # File management
@@ -114,11 +141,13 @@ railwaystudio/
 │
 ├── core/                   # Data Models
 │   ├── railway_system.py   # Core data structures
-│   └── json_formatter.py   # JSON serialization
+│   ├── json_formatter.py   # JSON serialization
+│   └── tcp_server.py       # TCP server for network updates
 │
 └── docs/                   # Documentation
+    ├── TCP_QUICKSTART.md   # Quick start for Docker integration
+    ├── TCP_INTEGRATION.md  # Complete TCP protocol guide
     ├── ARCHITECTURE.md     # Architecture details
-    ├── REFACTORING.md      # Refactoring guide
     └── ...                 # Additional docs
 ```
 
@@ -137,19 +166,47 @@ Logical sections of connected rails:
 - Each group has start/end blocks
 - Used for train tracking and signaling
 
-### Network Updates
-UDP packet format:
+### Network Updates (TCP Protocol)
+
+**Block Status Update** (recommended):
+```json
+{
+  "type": "status_update",
+  "block_id": "BL001001",
+  "status": "blocked"
+}
 ```
-BLOCK_ID:COLOR
+
+**Status Values:**
+- `"free"` → Green (block available)
+- `"reserved"` → Orange (reserved for train)
+- `"blocked"` → Red (occupied by train)
+- `"unknown"` → Gray (status unknown)
+
+**Batch Update** (for multiple blocks):
+```json
+{
+  "type": "batch_update",
+  "updates": [
+    {"block_id": "BL001001", "status": "blocked"},
+    {"block_id": "BL001002", "status": "free"}
+  ]
+}
 ```
-Example: `BL001:green` or `BL002:red`
+
+**Getting Block IDs for Docker:**
+```bash
+# Extract Block IDs from your layout file
+python3 examples/extract_block_ids.py layouts/your_layout.json
+```
 
 ## 🔧 Configuration
 
 ### Network Settings
-- **UDP Port**: 5000 (default)
-- **IP Address**: Configurable in settings
-- **Gateway/Subnet**: Full network configuration available
+- **TCP Port**: 5555 (default, configurable)
+- **Protocol**: TCP server (listens on 0.0.0.0)
+- **Multi-Client**: Supports multiple simultaneous connections
+- **Auto-Reconnect**: Clients can reconnect automatically
 
 ### Display Settings
 - **Grid**: Toggle dot grid for alignment
@@ -160,6 +217,12 @@ Example: `BL001:green` or `BL002:red`
 
 Detailed documentation is available in the `docs/` folder:
 
+**TCP Integration (New! 🔥)**
+- **[TCP Quick Start](docs/TCP_QUICKSTART.md)** - Get started with Docker in 5 minutes
+- **[TCP Integration Guide](docs/TCP_INTEGRATION.md)** - Complete protocol documentation
+- **[Block ID Mapping Guide](docs/BLOCK_ID_MAPPING.md)** - Understanding Block IDs (BL00X00X)
+
+**General Documentation**
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System architecture and design patterns
 - **[Refactoring Guide](docs/REFACTORING.md)** - Code structure and refactoring details
 - **[Connection Validation](docs/CONNECTION_VALIDATION.md)** - How validation works
