@@ -1,6 +1,6 @@
 # RailwayStudio
 
-A professional railway layout editor and real-time monitoring application built with Python and Qt.
+A railway layout editor and real-time monitoring application built with Python and Qt.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue.svg)
 ![PySide6](https://img.shields.io/badge/PySide6-6.8+-green.svg)
